@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MTD Conversion Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0C0F14;--s1:#131720;--s2:#1A2030;--s3:#222D3E;--bd:#232B3A;--bd2:#2E3A4E;--tx:#E8EDF5;--mu:#5A6A80;--ac:#3B82F6;--ac2:#60A5FA;--gn:#10B981;--rd:#EF4444;--am:#F59E0B;--pu:#A78BFA;--fn:'Syne',sans-serif;--fm:'DM Mono',monospace;--r:10px}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--tx);font-family:var(--fn);min-height:100vh}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(var(--bd) 1px,transparent 1px),linear-gradient(90deg,var(--bd) 1px,transparent 1px);background-size:48px 48px;opacity:.22;pointer-events:none;z-index:0}
+.wrap{position:relative;z-index:1;max-width:1300px;margin:0 auto;padding:20px 18px 60px}
+/* HEADER */
+.hdr{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:22px;gap:14px;flex-wrap:wrap}
+.hdr h1{font-size:26px;font-weight:800;letter-spacing:-.5px}
+.hdr h1 em{color:var(--ac);font-style:normal}
+.hdr p{font-size:11px;color:var(--mu);font-family:var(--fm);margin-top:4px}
+.hdr-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.badge{display:inline-flex;align-items:center;gap:6px;background:var(--s2);border:1px solid var(--bd2);border-radius:20px;padding:5px 12px;font-size:11px;font-family:var(--fm);color:var(--mu)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--gn);animation:p 2s infinite}
+@keyframes p{0%,100%{opacity:1}50%{opacity:.3}}
+/* SHARE BANNER */
+.share-banner{display:flex;align-items:center;justify-content:space-between;background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.25);border-radius:var(--r);padding:10px 16px;margin-bottom:16px;gap:12px;flex-wrap:wrap}
+.share-banner p{font-size:12px;color:var(--ac2);font-family:var(--fm)}
+.share-banner p strong{color:var(--tx)}
+.share-url{background:var(--s2);border:1px solid var(--bd2);border-radius:6px;padding:6px 10px;font-size:10px;font-family:var(--fm);color:var(--mu);flex:1;white-space:nowrap;overflow-x:auto;max-width:460px;user-select:all;cursor:text}
+.btn-share{padding:7px 16px;border-radius:7px;border:none;cursor:pointer;font-family:var(--fn);font-weight:700;font-size:12px;background:var(--ac);color:#fff;transition:all .15s;white-space:nowrap;display:flex;align-items:center;gap:6px}
+.btn-share:hover{background:var(--ac2)}
+.btn-share.copied{background:var(--gn)}
+/* VIEWER MODE BANNER */
+.view-banner{display:flex;align-items:center;gap:10px;background:rgba(167,139,250,.08);border:1px solid rgba(167,139,250,.25);border-radius:var(--r);padding:10px 16px;margin-bottom:16px}
+.view-banner p{font-size:12px;color:var(--pu);font-family:var(--fm)}
+/* TABS */
+.tabs{display:flex;gap:0;background:var(--s2);border:1px solid var(--bd);border-radius:var(--r);padding:4px;width:fit-content;margin-bottom:14px}
+.tab{padding:6px 16px;border-radius:7px;border:none;cursor:pointer;font-family:var(--fn);font-weight:700;font-size:12px;background:transparent;color:var(--mu);transition:all .15s}
+.tab.active{background:var(--s3);color:var(--tx)}
+/* KPIS */
+.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:14px}
+.kpi{background:var(--s1);border:1px solid var(--bd);border-radius:var(--r);padding:14px 16px}
+.kl{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--mu);font-family:var(--fm);margin-bottom:6px}
+.kv{font-size:24px;font-weight:800;letter-spacing:-1px;line-height:1}
+.ks{font-size:10px;color:var(--mu);font-family:var(--fm);margin-top:4px}
+.c-gn{color:var(--gn)}.c-rd{color:var(--rd)}.c-am{color:var(--am)}.c-ac{color:var(--ac2)}.c-pu{color:var(--pu)}
+/* STATUS */
+.status{display:flex;align-items:center;justify-content:space-between;background:var(--s1);border:1px solid var(--bd);border-radius:var(--r);padding:12px 18px;margin-bottom:14px;gap:12px;flex-wrap:wrap}
+.status.ok{border-color:var(--gn);background:rgba(16,185,129,.06)}
+.status.risk{border-color:var(--am);background:rgba(245,158,11,.06)}
+.status.bad{border-color:var(--rd);background:rgba(239,68,68,.06)}
+.s-l{display:flex;align-items:center;gap:10px}
+.s-ic{font-size:20px}
+.s-t strong{display:block;font-size:13px;font-weight:700}
+.s-t span{font-size:11px;color:var(--mu);font-family:var(--fm)}
+.pill{padding:5px 12px;border-radius:20px;font-size:11px;font-weight:700;font-family:var(--fm)}
+.p-ok{background:rgba(16,185,129,.15);color:var(--gn)}
+.p-risk{background:rgba(245,158,11,.15);color:var(--am)}
+.p-bad{background:rgba(239,68,68,.15);color:var(--rd)}
+/* LAYOUT */
+.grid{display:grid;grid-template-columns:1fr 300px;gap:14px;margin-bottom:14px}
+.card{background:var(--s1);border:1px solid var(--bd);border-radius:var(--r);padding:18px}
+.ct{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mu);margin-bottom:3px}
+.cs{font-size:11px;color:var(--mu);font-family:var(--fm);margin-bottom:14px}
+.leg{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px}
+.li{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--mu);font-family:var(--fm)}
+.ld{width:20px;height:2px;border-radius:1px;flex-shrink:0}
+.ldot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.ch{position:relative;height:320px}
+.ch-sm{position:relative;height:200px}
+/* INPUTS */
+.inp-lbl{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--mu);font-family:var(--fm);margin-bottom:5px;margin-top:10px;display:block}
+.inp-lbl:first-child{margin-top:0}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.row3{display:grid;grid-template-columns:1fr 1fr auto;gap:8px}
+.inp{background:var(--s2);border:1px solid var(--bd2);border-radius:7px;padding:8px 10px;color:var(--tx);font-family:var(--fm);font-size:12px;width:100%;outline:none;transition:border-color .2s}
+.inp:focus{border-color:var(--ac)}
+.inp::placeholder{color:var(--mu)}
+.btn{padding:8px 14px;border-radius:7px;border:none;cursor:pointer;font-family:var(--fn);font-weight:700;font-size:12px;transition:all .15s;white-space:nowrap}
+.btn-p{background:var(--ac);color:#fff}.btn-p:hover{background:var(--ac2)}
+.btn-d{background:rgba(239,68,68,.12);color:var(--rd);border:1px solid rgba(239,68,68,.25)}.btn-d:hover{background:rgba(239,68,68,.2)}
+.msg{font-size:11px;font-family:var(--fm);margin-top:6px;min-height:14px}
+/* TABLE */
+.tbl{width:100%;border-collapse:collapse;font-size:11px;font-family:var(--fm)}
+.tbl th{text-align:left;padding:6px 8px;color:var(--mu);border-bottom:1px solid var(--bd);font-size:9px;letter-spacing:.08em;text-transform:uppercase}
+.tbl td{padding:6px 8px;border-bottom:1px solid rgba(35,43,58,.4);color:var(--tx)}
+.tbl tr:last-child td{border-bottom:none}
+.del{background:none;border:none;color:var(--mu);cursor:pointer;padding:1px 5px;border-radius:3px;font-size:13px;transition:color .15s}
+.del:hover{color:var(--rd)}
+.empty{text-align:center;padding:28px;color:var(--mu);font-size:12px;font-family:var(--fm)}
+/* TARGET */
+.tgt-row{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.tgt-lbl{font-size:11px;font-family:var(--fm);color:var(--mu);width:54px;flex-shrink:0}
+input[type=range]{flex:1;accent-color:var(--ac);cursor:pointer}
+.tgt-v{font-size:14px;font-weight:700;font-family:var(--fm);color:var(--ac2);width:46px;text-align:right;flex-shrink:0}
+.sc-row{display:flex;gap:6px;margin-bottom:10px}
+.sc{flex:1;padding:7px 4px;border-radius:7px;border:1px solid var(--bd2);background:var(--s2);color:var(--mu);font-size:10px;font-family:var(--fm);cursor:pointer;transition:all .15s;text-align:center}
+.sc:hover,.sc.active{border-color:var(--ac);background:rgba(59,130,246,.1);color:var(--ac2)}
+.sc.bull.active{border-color:var(--gn);background:rgba(16,185,129,.1);color:var(--gn)}
+.sc.bear.active{border-color:var(--rd);background:rgba(239,68,68,.1);color:var(--rd)}
+.hg{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-top:14px}
+.hc{background:var(--s2);border:1px solid var(--bd);border-radius:8px;padding:10px;text-align:center}
+.hl{font-size:9px;letter-spacing:.07em;text-transform:uppercase;color:var(--mu);font-family:var(--fm);margin-bottom:4px}
+.hv{font-size:14px;font-weight:700}
+.sel{background:var(--s2);border:1px solid var(--bd2);border-radius:7px;padding:7px 10px;color:var(--tx);font-family:var(--fm);font-size:12px;outline:none;cursor:pointer}
+hr{border:none;border-top:1px solid var(--bd);margin:10px 0}
+.paste-wrap textarea{background:var(--s2);border:1px solid var(--bd2);border-radius:7px;padding:9px;color:var(--tx);font-family:var(--fm);font-size:11px;width:100%;height:100px;resize:vertical;outline:none}
+.paste-wrap textarea:focus{border-color:var(--ac)}
+/* LAST UPDATED */
+.updated{font-size:10px;color:var(--mu);font-family:var(--fm);text-align:right;margin-bottom:8px}
+@media(max-width:900px){.grid{grid-template-columns:1fr}.kpis{grid-template-columns:repeat(3,1fr)}.hg{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:520px){.kpis{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- HEADER -->
+<div class="hdr">
+  <div>
+    <h1>MTD <em>Conversion</em> Dashboard</h1>
+    <p id="hdrSub">Calibrated on PTDsalesfilev2 · May-25 → Apr-26 · Projections always ≥ current rate</p>
+  </div>
+  <div class="hdr-right">
+    <div class="badge"><span class="dot"></span>Live Projection</div>
+    <select class="sel" id="monSel" onchange="onMonthChange()"><option value="">-- Month --</option></select>
+  </div>
+</div>
+
+<!-- SHARE BANNER -->
+<div class="share-banner" id="shareBanner">
+  <div style="flex:1;min-width:0">
+    <p style="margin-bottom:6px"><strong>Share this dashboard</strong> — copy the link below and send it to anyone</p>
+    <div id="hostingHint" style="display:none;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+      <span style="font-size:11px;color:var(--am);font-family:var(--fm)">&#9888; To get a shareable link, host this file then enter its URL:</span>
+      <input type="text" id="baseUrlInput" class="inp" style="width:260px;padding:5px 9px;font-size:11px" placeholder="https://yoursite.com/mtd_dashboard.html">
+      <button class="btn btn-p" style="padding:5px 12px;font-size:11px" onclick="setBaseUrl()">Save URL</button>
+      <a href="https://app.netlify.com/drop" target="_blank" style="font-size:10px;color:var(--ac2);font-family:var(--fm)">&#8594; Host free on Netlify Drop</a>
+    </div>
+    <div id="shareUrlBox" class="share-url" title="Click to select">Generating...</div>
+  </div>
+  <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0">
+    <div id="lastUpdated" class="updated"></div>
+    <button class="btn-share" id="shareBtn" onclick="copyShareLink()">&#128279; Copy Link</button>
+  </div>
+</div>
+
+<!-- VIEW-ONLY BANNER (shown when loaded from shared URL) -->
+<div class="view-banner" id="viewBanner" style="display:none">
+  <span style="font-size:18px">👁</span>
+  <p><strong>View-only mode</strong> — you are viewing a shared snapshot. Data was last updated <span id="snapTime">—</span>. Changes you make here stay local only — they won't update the shared link unless you re-share.</p>
+</div>
+
+<!-- LAST UPDATED -->
+<div class="updated" id="globalUpdated"></div>
+
+<!-- KPIS -->
+<div class="kpis">
+  <div class="kpi"><div class="kl">Latest (Day <span id="kAD">—</span>)</div><div class="kv c-ac" id="kLat">—</div><div class="ks" id="kLatSub">—</div></div>
+  <div class="kpi"><div class="kl">Bear Projection</div><div class="kv c-rd" id="kBe">—</div><div class="ks" id="kBeSub">p25 trajectory</div></div>
+  <div class="kpi"><div class="kl">Base Projection</div><div class="kv" id="kBa">—</div><div class="ks" id="kBaSub">avg trajectory</div></div>
+  <div class="kpi"><div class="kl">Bull Projection</div><div class="kv c-gn" id="kBu">—</div><div class="ks" id="kBuSub">recent 6M</div></div>
+  <div class="kpi"><div class="kl">Month Target</div><div class="kv c-am" id="kTgt">9.0%</div><div class="ks" id="kTgtSub">—</div></div>
+</div>
+
+<!-- STATUS -->
+<div class="status" id="statusBar" style="display:none">
+  <div class="s-l"><div class="s-ic" id="sIc">📊</div><div class="s-t"><strong id="sTi">—</strong><span id="sDe">—</span></div></div>
+  <div class="pill" id="sPi">—</div>
+</div>
+
+<!-- MAIN GRID -->
+<div class="grid">
+  <div class="card">
+    <div class="ct">Monthly MTD Trajectory</div>
+    <div class="cs" id="chartSub">Select a month and enter data to see projection</div>
+    <div class="leg">
+      <span class="li"><span class="ldot" style="background:var(--gn)"></span>Actuals</span>
+      <span class="li"><span class="ld" style="background:var(--ac)"></span>Base</span>
+      <span class="li"><span class="ld" style="background:var(--gn);opacity:.6"></span>Bull</span>
+      <span class="li"><span class="ld" style="background:var(--rd);opacity:.6"></span>Bear</span>
+      <span class="li"><span class="ld" style="background:rgba(255,255,255,.12)"></span>Prior months</span>
+      <span class="li"><span class="ld" style="background:var(--am)"></span>Target</span>
+    </div>
+    <div class="ch"><canvas id="mainChart"></canvas></div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:12px">
+    <!-- INPUT PANEL -->
+    <div class="card" id="inputPanel">
+      <div class="ct">Enter Data</div>
+      <div class="tabs">
+        <button class="tab active" id="tabSimple" onclick="switchTab('simple')">Simple</button>
+        <button class="tab" id="tabFull" onclick="switchTab('full')">Full Row</button>
+        <button class="tab" id="tabPaste" onclick="switchTab('paste')">Paste</button>
+      </div>
+
+      <div id="paneSimple">
+        <label class="inp-lbl">Date + Consolidated Rate (%)</label>
+        <div class="row3">
+          <input type="date" class="inp" id="sDate">
+          <input type="number" class="inp" id="sRate" placeholder="Rate %" step="0.001" min="0" max="100">
+          <button class="btn btn-p" onclick="addSimple()">Add</button>
+        </div>
+      </div>
+
+      <div id="paneFull" style="display:none">
+        <label class="inp-lbl">Date</label>
+        <input type="date" class="inp" id="fDate">
+        <div class="row2" style="margin-top:6px">
+          <div><label class="inp-lbl">Act Num</label><input type="number" class="inp" id="fAN" placeholder="0" min="0"></div>
+          <div><label class="inp-lbl">Act Den</label><input type="number" class="inp" id="fAD" placeholder="0" min="0"></div>
+        </div>
+        <div class="row2" style="margin-top:6px">
+          <div><label class="inp-lbl">Fav Num</label><input type="number" class="inp" id="fFN" placeholder="0" min="0"></div>
+          <div><label class="inp-lbl">Fav Den</label><input type="number" class="inp" id="fFD" placeholder="0" min="0"></div>
+        </div>
+        <div class="row2" style="margin-top:6px">
+          <div><label class="inp-lbl">Cons Num</label><input type="number" class="inp" id="fCN" placeholder="0" min="0"></div>
+          <div><label class="inp-lbl">Cons Den</label><input type="number" class="inp" id="fCD" placeholder="0" min="0"></div>
+        </div>
+        <button class="btn btn-p" style="width:100%;margin-top:10px" onclick="addFull()">Add Row</button>
+      </div>
+
+      <div id="panePaste" style="display:none" class="paste-wrap">
+        <label class="inp-lbl">Paste tab-separated rows (header optional)</label>
+        <textarea id="pasteBox" placeholder="2026-05-12&#9;63&#9;1693&#9;0.0372&#9;241&#9;5230&#9;0.0461&#9;304&#9;6923&#9;0.0439"></textarea>
+        <button class="btn btn-p" style="width:100%;margin-top:8px" onclick="parsePaste()">Import Rows</button>
+      </div>
+
+      <div class="msg" id="addMsg"></div>
+      <hr>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <span style="font-size:10px;color:var(--mu);font-family:var(--fm)">CURRENT DATA</span>
+        <button class="btn btn-d" style="font-size:10px;padding:3px 8px" onclick="clearMonth()">Clear</button>
+      </div>
+      <div id="tblWrap"><div class="empty">No data yet</div></div>
+    </div>
+
+    <!-- TARGET -->
+    <div class="card">
+      <div class="ct">Target & Scenario</div>
+      <div class="tgt-row" style="margin-top:6px">
+        <span class="tgt-lbl">Target</span>
+        <input type="range" id="tgtSl" min="1" max="20" step="0.1" value="9" oninput="onTgtSl()">
+        <span class="tgt-v" id="tgtDis">9.0%</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+        <span style="font-size:11px;font-family:var(--fm);color:var(--mu)">Custom:</span>
+        <input type="number" class="inp" id="tgtIn" style="width:76px;padding:5px 8px" value="9" step="0.1" min="0" max="100" onchange="onTgtIn()">
+        <span style="font-size:11px;font-family:var(--fm);color:var(--mu)">%</span>
+      </div>
+      <div style="font-size:10px;color:var(--mu);font-family:var(--fm);margin-bottom:5px;letter-spacing:.06em">SCENARIO</div>
+      <div class="sc-row">
+        <div class="sc bear" id="scBear" onclick="setScen('bear')">Bear<br><span style="font-size:9px">p25</span></div>
+        <div class="sc active" id="scBase" onclick="setScen('base')">Base<br><span style="font-size:9px">avg</span></div>
+        <div class="sc bull" id="scBull" onclick="setScen('bull')">Bull<br><span style="font-size:9px">rec.6M</span></div>
+      </div>
+      <div style="font-size:10px;color:var(--mu);font-family:var(--fm);margin-bottom:5px;letter-spacing:.06em">HISTORY OVERLAY</div>
+      <div class="sc-row">
+        <div class="sc active" id="togNone" onclick="setHist('none')">Hide</div>
+        <div class="sc" id="togRecent" onclick="setHist('recent')">Recent 3M</div>
+        <div class="sc" id="togAll" onclick="setHist('all')">All</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- HISTORY CHART -->
+<div class="card" style="margin-bottom:14px">
+  <div class="ct">Month-End Rate History + Projection</div>
+  <div class="cs">Final consolidated rate per month · Current month projection at right</div>
+  <div class="ch-sm"><canvas id="histChart"></canvas></div>
+</div>
+<div class="hg" id="hGrid"></div>
+
+</div>
+<script>
+// ===== MODEL =====
+const MULT_MATRIX = {"2": {"2": {"p25": 1.0, "avg": 1.0, "p75": 1.0, "recent": 1.0}, "3": {"p25": 1.581, "avg": 1.6782, "p75": 1.7802, "recent": 1.7694}, "5": {"p25": 2.5392, "avg": 3.1271, "p75": 4.0902, "recent": 3.5006}, "6": {"p25": 3.1881, "avg": 3.8961, "p75": 5.2845, "recent": 4.4425}, "7": {"p25": 3.6395, "avg": 4.6711, "p75": 6.1477, "recent": 5.2507}, "8": {"p25": 3.268, "avg": 3.8244, "p75": 4.3129, "recent": 4.0452}, "9": {"p25": 4.0059, "avg": 5.1494, "p75": 6.6845, "recent": 6.2333}, "10": {"p25": 4.2646, "avg": 5.7213, "p75": 7.7818, "recent": 6.7516}, "12": {"p25": 5.2826, "avg": 6.8466, "p75": 9.022, "recent": 8.0871}, "13": {"p25": 5.7455, "avg": 7.4292, "p75": 9.4643, "recent": 8.6795}, "14": {"p25": 6.0099, "avg": 8.2396, "p75": 10.369, "recent": 9.2794}, "15": {"p25": 4.8745, "avg": 5.5529, "p75": 6.2903, "recent": 5.5529}, "16": {"p25": 6.524, "avg": 8.1711, "p75": 9.8409, "recent": 9.8793}, "17": {"p25": 6.7282, "avg": 8.6317, "p75": 10.6491, "recent": 10.201}, "19": {"p25": 7.2319, "avg": 9.4031, "p75": 11.4571, "recent": 11.129}, "20": {"p25": 7.764, "avg": 9.9735, "p75": 11.9147, "recent": 11.6062}, "21": {"p25": 7.961, "avg": 10.778, "p75": 12.9694, "recent": 12.0319}, "22": {"p25": 7.0934, "avg": 7.7725, "p75": 8.7022, "recent": 8.2134}, "23": {"p25": 8.0024, "avg": 10.3332, "p75": 11.5652, "recent": 12.5124}, "24": {"p25": 8.2108, "avg": 10.8086, "p75": 12.7218, "recent": 12.7389}, "26": {"p25": 8.1328, "avg": 11.5427, "p75": 14.4292, "recent": 13.1412}, "27": {"p25": 8.9706, "avg": 12.1622, "p75": 14.8086, "recent": 13.7112}, "28": {"p25": 9.1737, "avg": 12.0793, "p75": 13.8407, "recent": 14.2882}, "29": {"p25": 8.1741, "avg": 9.1667, "p75": 10.3941, "recent": 9.5809}, "30": {"p25": 8.7756, "avg": 11.5151, "p75": 11.9541, "recent": 12.9327}, "31": {"p25": 9.5119, "avg": 12.7976, "p75": 11.8734, "recent": 12.7976}, "4": {"p25": 2.1286, "avg": 2.4299, "p75": 2.7662, "recent": 2.6637}, "11": {"p25": 4.5579, "avg": 6.4031, "p75": 8.6814, "recent": 7.3463}, "18": {"p25": 7.2726, "avg": 9.9166, "p75": 12.3375, "recent": 10.6289}, "25": {"p25": 8.8622, "avg": 11.603, "p75": 14.1813, "recent": 13.2791}}, "3": {"3": {"p25": 1.0, "avg": 1.0, "p75": 1.0, "recent": 1.0}, "5": {"p25": 1.5809, "avg": 1.8359, "p75": 2.1061, "recent": 1.9619}, "6": {"p25": 1.7374, "avg": 2.193, "p75": 2.564, "recent": 2.4513}, "7": {"p25": 2.1486, "avg": 2.6343, "p75": 2.9733, "recent": 2.8604}, "8": {"p25": 2.1887, "avg": 2.5683, "p75": 2.8173, "recent": 2.7801}, "9": {"p25": 2.4988, "avg": 2.9553, "p75": 3.3313, "recent": 3.3142}, "10": {"p25": 2.832, "avg": 3.3511, "p75": 3.9161, "recent": 3.8854}, "12": {"p25": 3.2475, "avg": 3.7271, "p75": 4.5291, "recent": 4.0348}, "13": {"p25": 3.5497, "avg": 4.1431, "p75": 5.1447, "recent": 4.6781}, "14": {"p25": 3.6876, "avg": 4.6416, "p75": 5.6723, "recent": 5.0559}, "15": {"p25": 3.6942, "avg": 4.3482, "p75": 5.0263, "recent": 4.6151}, "16": {"p25": 3.9489, "avg": 4.613, "p75": 5.6291, "recent": 5.1494}, "17": {"p25": 4.1884, "avg": 4.9815, "p75": 6.0273, "recent": 5.7277}, "19": {"p25": 4.4844, "avg": 5.1572, "p75": 6.5287, "recent": 5.6071}, "20": {"p25": 4.6089, "avg": 5.3495, "p75": 6.8065, "recent": 5.8149}, "21": {"p25": 4.7868, "avg": 5.8138, "p75": 7.0907, "recent": 6.0012}, "22": {"p25": 4.8668, "avg": 5.3528, "p75": 5.5823, "recent": 5.7696}, "23": {"p25": 5.069, "avg": 5.6557, "p75": 6.8795, "recent": 6.226}, "24": {"p25": 5.1881, "avg": 6.0674, "p75": 7.5167, "recent": 6.87}, "26": {"p25": 5.3274, "avg": 6.3957, "p75": 7.9741, "recent": 6.7632}, "27": {"p25": 5.621, "avg": 6.6479, "p75": 8.0231, "recent": 7.4287}, "28": {"p25": 5.6874, "avg": 6.8434, "p75": 8.2292, "recent": 7.6675}, "29": {"p25": 5.6052, "avg": 6.4512, "p75": 6.7373, "recent": 6.9384}, "30": {"p25": 5.7307, "avg": 6.7944, "p75": 7.9151, "recent": 7.5137}, "31": {"p25": 5.9652, "avg": 6.7534, "p75": 6.4704, "recent": 6.7534}, "4": {"p25": 1.3, "avg": 1.467, "p75": 1.635, "recent": 1.546}, "11": {"p25": 2.9276, "avg": 3.7201, "p75": 4.5119, "recent": 4.126}, "18": {"p25": 4.4011, "avg": 5.6527, "p75": 6.4529, "recent": 5.8846}, "25": {"p25": 5.451, "avg": 6.5157, "p75": 7.9039, "recent": 7.1155}}, "5": {"5": {"p25": 1.0, "avg": 1.0, "p75": 1.0, "recent": 1.0}, "6": {"p25": 1.2095, "avg": 1.2345, "p75": 1.2774, "recent": 1.2732}, "7": {"p25": 1.4121, "avg": 1.4586, "p75": 1.5652, "recent": 1.5195}, "8": {"p25": 1.2768, "avg": 1.4724, "p75": 1.6675, "recent": 1.5347}, "9": {"p25": 1.453, "avg": 1.6658, "p75": 1.8582, "recent": 1.8182}, "10": {"p25": 1.6501, "avg": 1.8334, "p75": 2.0055, "recent": 1.989}, "12": {"p25": 1.9352, "avg": 2.1287, "p75": 2.267, "recent": 2.3245}, "13": {"p25": 2.2223, "avg": 2.3285, "p75": 2.4758, "recent": 2.4988}, "14": {"p25": 2.42, "avg": 2.5445, "p75": 2.643, "recent": 2.6798}, "15": {"p25": 2.0964, "avg": 2.2344, "p75": 2.5309, "recent": 2.2344}, "16": {"p25": 2.3282, "avg": 2.6082, "p75": 2.7642, "recent": 2.8509}, "17": {"p25": 2.4171, "avg": 2.7378, "p75": 2.935, "recent": 2.998}, "19": {"p25": 2.6275, "avg": 2.9243, "p75": 3.1862, "recent": 3.2196}, "20": {"p25": 2.7743, "avg": 3.0804, "p75": 3.4007, "recent": 3.3526}, "21": {"p25": 2.9235, "avg": 3.2944, "p75": 3.5222, "recent": 3.4622}, "22": {"p25": 2.7783, "avg": 2.9825, "p75": 3.2083, "recent": 3.104}, "23": {"p25": 2.8865, "avg": 3.2751, "p75": 3.7084, "recent": 3.5675}, "24": {"p25": 2.9497, "avg": 3.4209, "p75": 3.8661, "recent": 3.7251}, "26": {"p25": 3.1267, "avg": 3.5069, "p75": 3.6653, "recent": 3.7791}, "27": {"p25": 3.2632, "avg": 3.7475, "p75": 4.1119, "recent": 4.0119}, "28": {"p25": 3.2425, "avg": 3.7875, "p75": 4.1951, "recent": 4.1407}, "29": {"p25": 3.2013, "avg": 3.5357, "p75": 3.9045, "recent": 3.6356}, "30": {"p25": 3.287, "avg": 3.8666, "p75": 4.2571, "recent": 4.1035}, "31": {"p25": 3.4171, "avg": 4.2807, "p75": 4.6761, "recent": 4.2807}, "11": {"p25": 1.7548, "avg": 1.9421, "p75": 2.0733, "recent": 2.0721}, "18": {"p25": 2.6125, "avg": 2.8911, "p75": 2.9691, "recent": 2.9685}, "25": {"p25": 3.1319, "avg": 3.5515, "p75": 3.9726, "recent": 3.7833}}, "6": {"6": {"p25": 1.0, "avg": 1.0, "p75": 1.0, "recent": 1.0}, "7": {"p25": 1.151, "avg": 1.1918, "p75": 1.224, "recent": 1.2186}, "8": {"p25": 1.2114, "avg": 1.2994, "p75": 1.3958, "recent": 1.3803}, "9": {"p25": 1.3042, "avg": 1.4302, "p75": 1.4824, "recent": 1.5582}, "10": {"p25": 1.4336, "avg": 1.5724, "p75": 1.6781, "recent": 1.7063}, "12": {"p25": 1.6183, "avg": 1.7446, "p75": 1.8419, "recent": 1.839}, "13": {"p25": 1.7727, "avg": 1.9325, "p75": 2.0327, "recent": 2.0956}, "14": {"p25": 2.0348, "avg": 2.1485, "p75": 2.2238, "recent": 2.256}, "15": {"p25": 1.8319, "avg": 2.1262, "p75": 2.2239, "recent": 2.1262}, "16": {"p25": 2.0015, "avg": 2.255, "p75": 2.3914, "recent": 2.4597}, "17": {"p25": 2.073, "avg": 2.3744, "p75": 2.5569, "recent": 2.6145}, "19": {"p25": 2.1681, "avg": 2.3888, "p75": 2.5767, "recent": 2.5418}, "20": {"p25": 2.2352, "avg": 2.5105, "p75": 2.7315, "recent": 2.7298}, "21": {"p25": 2.3679, "avg": 2.6976, "p75": 2.8634, "recent": 2.8251}, "22": {"p25": 2.41, "avg": 2.6348, "p75": 2.8868, "recent": 2.779}, "23": {"p25": 2.3912, "avg": 2.7723, "p75": 3.0508, "recent": 3.0584}, "24": {"p25": 2.4806, "avg": 2.9063, "p75": 3.1695, "recent": 3.2006}, "26": {"p25": 2.5637, "avg": 2.8733, "p75": 3.1073, "recent": 2.9921}, "27": {"p25": 2.6574, "avg": 3.1271, "p75": 3.4701, "recent": 3.4534}, "28": {"p25": 2.7112, "avg": 3.216, "p75": 3.581, "recent": 3.5771}, "29": {"p25": 2.7371, "avg": 3.1574, "p75": 3.5175, "recent": 3.3274}, "30": {"p25": 2.8683, "avg": 3.3562, "p75": 3.8544, "recent": 3.6623}, "31": {"p25": 3.0214, "avg": 3.6547, "p75": 4.1315, "recent": 3.6547}, "11": {"p25": 1.578, "avg": 1.6983, "p75": 1.7015, "recent": 1.8169}, "18": {"p25": 2.1698, "avg": 2.5112, "p75": 2.7622, "recent": 2.6468}, "25": {"p25": 2.5412, "avg": 3.0391, "p75": 3.3744, "recent": 3.2988}}, "7": {"7": {"p25": 1.0, "avg": 1.0, "p75": 1.0, "recent": 1.0}, "8": {"p25": 1.0974, "avg": 1.1408, "p75": 1.147, "recent": 1.1498}, "9": {"p25": 1.2257, "avg": 1.2493, "p75": 1.2497, "recent": 1.2973}, "10": {"p25": 1.3314, "avg": 1.3811, "p75": 1.4037, "recent": 1.447}, "12": {"p25": 1.4459, "avg": 1.5272, "p75": 1.5571, "recent": 1.5695}, "13": {"p25": 1.5838, "avg": 1.6738, "p75": 1.6527, "recent": 1.7489}, "14": {"p25": 1.6791, "avg": 1.7882, "p75": 1.8263, "recent": 1.8883}, "15": {"p25": 1.826, "avg": 1.9354, "p75": 1.9687, "recent": 1.9354}, "16": {"p25": 1.856, "avg": 1.9611, "p75": 2.0826, "recent": 2.0737}, "17": {"p25": 1.9518, "avg": 2.0893, "p75": 2.2587, "recent": 2.2136}, "19": {"p25": 1.9838, "avg": 2.1115, "p75": 2.2443, "recent": 2.2214}, "20": {"p25": 2.0096, "avg": 2.2078, "p75": 2.4318, "recent": 2.3315}, "21": {"p25": 2.0655, "avg": 2.2888, "p75": 2.5059, "recent": 2.4566}, "22": {"p25": 2.207, "avg": 2.3345, "p75": 2.499, "recent": 2.3878}, "23": {"p25": 2.1929, "avg": 2.4386, "p75": 2.6508, "recent": 2.6329}, "24": {"p25": 2.4046, "avg": 2.5504, "p75": 2.7416, "recent": 2.7197}, "26": {"p25": 2.2302, "avg": 2.5663, "p75": 2.8107, "recent": 2.6491}, "27": {"p25": 2.5242, "avg": 2.7465, "p75": 3.0165, "recent": 2.9102}, "28": {"p25": 2.4783, "avg": 2.7533, "p75": 3.0757, "recent": 3.0305}, "29": {"p25": 2.6018, "avg": 2.7692, "p75": 2.9693, "recent": 2.8665}, "30": {"p25": 2.7457, "avg": 2.9274, "p75": 3.2038, "recent": 3.1163}, "31": {"p25": 2.9507, "avg": 3.1379, "p75": 3.2943, "recent": 3.1379}, "11": {"p25": 1.3605, "avg": 1.4949, "p75": 1.5271, "recent": 1.5457}, "18": {"p25": 1.9499, "avg": 2.1616, "p75": 2.3996, "recent": 2.2927}, "25": {"p25": 2.5035, "avg": 2.6053, "p75": 2.8187, "recent": 2.8022}}, "8": {"8": {"p25": 1.0, "avg": 1.0, "p75": 1.0, "recent": 1.0}, "9": {"p25": 1.0934, "avg": 1.1231, "p75": 1.1326, "recent": 1.1377}, "10": {"p25": 1.1812, "avg": 1.2278, "p75": 1.2706, "recent": 1.2606}, "12": {"p25": 1.3228, "avg": 1.3767, "p75": 1.4424, "recent": 1.3912}, "13": {"p25": 1.4275, "avg": 1.4748, "p75": 1.5291, "recent": 1.4967}, "14": {"p25": 1.5164, "avg": 1.5549, "p75": 1.5758, "recent": 1.5685}, "15": {"p25": 1.6412, "avg": 1.6735, "p75": 1.6954, "recent": 1.6894}, "16": {"p25": 1.7015, "avg": 1.7318, "p75": 1.7894, "recent": 1.7702}, "17": {"p25": 1.7685, "avg": 1.836, "p75": 1.8883, "recent": 1.8679}, "19": {"p25": 1.8513, "avg": 1.8669, "p75": 1.9343, "recent": 1.9167}, "20": {"p25": 1.9074, "avg": 1.925, "p75": 2.0062, "recent": 1.9788}, "21": {"p25": 1.9126, "avg": 1.9833, "p75": 2.1149, "recent": 1.9833}, "22": {"p25": 1.9839, "avg": 2.0562, "p75": 2.116, "recent": 2.1324}, "23": {"p25": 2.0332, "avg": 2.117, "p75": 2.2086, "recent": 2.1838}, "24": {"p25": 2.1553, "avg": 2.2376, "p75": 2.3335, "recent": 2.2894}, "26": {"p25": 2.176, "avg": 2.2797, "p75": 2.4589, "recent": 2.2797}, "27": {"p25": 2.2493, "avg": 2.3876, "p75": 2.4797, "recent": 2.4197}, "28": {"p25": 2.2478, "avg": 2.3907, "p75": 2.5534, "recent": 2.5054}, "29": {"p25": 2.3112, "avg": 2.4586, "p75": 2.6719, "recent": 2.6026}, "30": {"p25": 2.4916, "avg": 2.6069, "p75": 2.7239, "recent": 2.6785}, "31": {"p25": 2.548, "avg": 2.5871, "p75": 2.6413, "recent": 2.5871}, "11": {"p25": 1.2561, "avg": 1.3089, "p75": 1.3562, "recent": 1.3281}, "18": {"p25": 1.8404, "avg": 1.8811, "p75": 1.9731, "recent": 1.8811}, "25": {"p25": 2.1943, "avg": 2.2751, "p75": 2.4349, "recent": 2.3498}}, "9": {"9": {"p25": 1.0, "avg": 1.0, "p75": 1.0, "recent": 1.0}, "10": {"p25": 1.0902, "avg": 1.1184, "p75": 1.1342, "recent": 1.141}, "12": {"p25": 1.2339, "avg": 1.285, "p75": 1.3064, "recent": 1.331}, "13": {"p25": 1.3061, "avg": 1.363, "p75": 1.4137, "recent": 1.4193}, "14": {"p25": 1.3582, "avg": 1.4397, "p75": 1.4529, "recent": 1.492}, "15": {"p25": 1.4687, "avg": 1.4807, "p75": 1.4878, "recent": 1.4807}, "16": {"p25": 1.5073, "avg": 1.573, "p75": 1.6344, "recent": 1.6446}, "17": {"p25": 1.5854, "avg": 1.6741, "p75": 1.7615, "recent": 1.7443}, "19": {"p25": 1.6438, "avg": 1.7572, "p75": 1.7932, "recent": 1.8475}, "20": {"p25": 1.7026, "avg": 1.8369, "p75": 1.9444, "recent": 1.9431}, "21": {"p25": 1.7219, "avg": 1.8978, "p75": 2.0594, "recent": 1.9897}, "22": {"p25": 1.7158, "avg": 1.827, "p75": 1.9159, "recent": 1.8906}, "23": {"p25": 1.76, "avg": 1.9583, "p75": 2.0913, "recent": 2.1316}, "24": {"p25": 1.8631, "avg": 2.0653, "p75": 2.216, "recent": 2.2229}, "26": {"p25": 1.9119, "avg": 2.1517, "p75": 2.3308, "recent": 2.264}, "27": {"p25": 1.9645, "avg": 2.2185, "p75": 2.4606, "recent": 2.375}, "28": {"p25": 1.9718, "avg": 2.2265, "p75": 2.4901, "recent": 2.4521}, "29": {"p25": 1.9949, "avg": 2.1685, "p75": 2.3003, "recent": 2.2779}, "30": {"p25": 2.0834, "avg": 2.3317, "p75": 2.532, "recent": 2.4839}, "31": {"p25": 2.1842, "avg": 2.4082, "p75": 2.3739, "recent": 2.4082}, "11": {"p25": 1.1815, "avg": 1.2114, "p75": 1.241, "recent": 1.2384}, "18": {"p25": 1.6262, "avg": 1.7478, "p75": 1.8981, "recent": 1.8171}, "25": {"p25": 1.8961, "avg": 2.1158, "p75": 2.3695, "recent": 2.2799}}, "10": {"10": {"p25": 1.0, "avg": 1.0, "p75": 1.0, "recent": 1.0}, "12": {"p25": 1.1303, "avg": 1.1528, "p75": 1.2023, "recent": 1.1831}, "13": {"p25": 1.2126, "avg": 1.2305, "p75": 1.2763, "recent": 1.2708}, "14": {"p25": 1.2213, "avg": 1.3049, "p75": 1.3755, "recent": 1.3594}, "15": {"p25": 1.3035, "avg": 1.366, "p75": 1.4242, "recent": 1.3834}, "16": {"p25": 1.3684, "avg": 1.4194, "p75": 1.4621, "recent": 1.4629}, "17": {"p25": 1.4467, "avg": 1.5044, "p75": 1.5714, "recent": 1.5656}, "19": {"p25": 1.5076, "avg": 1.6045, "p75": 1.7097, "recent": 1.6598}, "20": {"p25": 1.5801, "avg": 1.6884, "p75": 1.8205, "recent": 1.7618}, "21": {"p25": 1.6032, "avg": 1.7464, "p75": 1.8905, "recent": 1.8169}, "22": {"p25": 1.6469, "avg": 1.7123, "p75": 1.7794, "recent": 1.777}, "23": {"p25": 1.6357, "avg": 1.7726, "p75": 1.9426, "recent": 1.8888}, "24": {"p25": 1.7237, "avg": 1.8577, "p75": 2.0201, "recent": 2.0021}, "26": {"p25": 1.8049, "avg": 1.9744, "p75": 2.158, "recent": 2.0621}, "27": {"p25": 1.7922, "avg": 2.006, "p75": 2.2349, "recent": 2.1717}, "28": {"p25": 1.8213, "avg": 2.067, "p75": 2.3267, "recent": 2.2499}, "29": {"p25": 1.9059, "avg": 2.0721, "p75": 2.2946, "recent": 2.1733}, "30": {"p25": 1.9096, "avg": 2.1291, "p75": 2.3853, "recent": 2.3041}, "31": {"p25": 1.961, "avg": 2.1304, "p75": 2.1564, "recent": 2.1304}, "11": {"p25": 1.0774, "avg": 1.0906, "p75": 1.1108, "recent": 1.1038}, "18": {"p25": 1.4955, "avg": 1.5904, "p75": 1.6703, "recent": 1.6348}, "25": {"p25": 1.8433, "avg": 1.9525, "p75": 2.1114, "recent": 2.074}}, "12": {"12": {"p25": 1.0, "avg": 1.0, "p75": 1.0, "recent": 1.0}, "13": {"p25": 1.0681, "avg": 1.0763, "p75": 1.0853, "recent": 1.0839}, "14": {"p25": 1.1289, "avg": 1.1409, "p75": 1.1676, "recent": 1.1588}, "15": {"p25": 1.1399, "avg": 1.1838, "p75": 1.2244, "recent": 1.1838}, "16": {"p25": 1.1813, "avg": 1.2193, "p75": 1.2531, "recent": 1.248}, "17": {"p25": 1.2737, "avg": 1.2932, "p75": 1.3373, "recent": 1.3284}, "19": {"p25": 1.3171, "avg": 1.3714, "p75": 1.4484, "recent": 1.4339}, "20": {"p25": 1.3691, "avg": 1.4202, "p75": 1.4691, "recent": 1.4804}, "21": {"p25": 1.4234, "avg": 1.4763, "p75": 1.5594, "recent": 1.5331}, "22": {"p25": 1.4443, "avg": 1.4815, "p75": 1.5288, "recent": 1.5066}, "23": {"p25": 1.4918, "avg": 1.5284, "p75": 1.5847, "recent": 1.5907}, "24": {"p25": 1.6085, "avg": 1.6171, "p75": 1.6478, "recent": 1.6635}, "26": {"p25": 1.5939, "avg": 1.6716, "p75": 1.7835, "recent": 1.759}, "27": {"p25": 1.6813, "avg": 1.7426, "p75": 1.8339, "recent": 1.7966}, "28": {"p25": 1.7227, "avg": 1.7572, "p75": 1.9124, "recent": 1.8573}, "29": {"p25": 1.7223, "avg": 1.7627, "p75": 1.8267, "recent": 1.8158}, "30": {"p25": 1.7777, "avg": 1.8381, "p75": 1.9459, "recent": 1.9038}, "31": {"p25": 1.8649, "avg": 1.9261, "p75": 1.9466, "recent": 1.9261}, "18": {"p25": 1.2862, "avg": 1.3262, "p75": 1.3828, "recent": 1.3498}, "25": {"p25": 1.6049, "avg": 1.6416, "p75": 1.7198, "recent": 1.7148}}, "13": {"13": {"p25": 1.0, "avg": 1.0, "p75": 1.0, "recent": 1.0}, "14": {"p25": 1.0568, "avg": 1.0765, "p75": 1.0977, "recent": 1.0884}, "15": {"p25": 1.084, "avg": 1.1297, "p75": 1.167, "recent": 1.1297}, "16": {"p25": 1.1265, "avg": 1.1606, "p75": 1.2087, "recent": 1.1978}, "17": {"p25": 1.18, "avg": 1.2288, "p75": 1.2722, "recent": 1.2744}, "19": {"p25": 1.2247, "avg": 1.2707, "p75": 1.344, "recent": 1.3173}, "20": {"p25": 1.2876, "avg": 1.3362, "p75": 1.4117, "recent": 1.3999}, "21": {"p25": 1.3222, "avg": 1.3931, "p75": 1.5007, "recent": 1.4483}, "22": {"p25": 1.3269, "avg": 1.3805, "p75": 1.4217, "recent": 1.4201}, "23": {"p25": 1.3399, "avg": 1.4297, "p75": 1.5026, "recent": 1.5064}, "24": {"p25": 1.4425, "avg": 1.5107, "p75": 1.5714, "recent": 1.5819}, "26": {"p25": 1.4527, "avg": 1.5494, "p75": 1.6495, "recent": 1.6121}, "27": {"p25": 1.5236, "avg": 1.627, "p75": 1.6997, "recent": 1.7198}, "28": {"p25": 1.4988, "avg": 1.6507, "p75": 1.7698, "recent": 1.7795}, "29": {"p25": 1.5341, "avg": 1.6592, "p75": 1.7788, "recent": 1.7387}, "30": {"p25": 1.5963, "avg": 1.7374, "p75": 1.8221, "recent": 1.8307}, "31": {"p25": 1.6583, "avg": 1.764, "p75": 1.7935, "recent": 1.764}, "18": {"p25": 1.2097, "avg": 1.2666, "p75": 1.3021, "recent": 1.3074}, "25": {"p25": 1.3977, "avg": 1.5431, "p75": 1.6017, "recent": 1.636}}, "14": {"14": {"p25": 1.0, "avg": 1.0, "p75": 1.0, "recent": 1.0}, "15": {"p25": 1.0716, "avg": 1.0797, "p75": 1.087, "recent": 1.0797}, "16": {"p25": 1.0667, "avg": 1.0923, "p75": 1.1394, "recent": 1.1197}, "17": {"p25": 1.1269, "avg": 1.1613, "p75": 1.2139, "recent": 1.1945}, "19": {"p25": 1.1544, "avg": 1.2104, "p75": 1.2781, "recent": 1.2508}, "20": {"p25": 1.2076, "avg": 1.2506, "p75": 1.3335, "recent": 1.2931}, "21": {"p25": 1.248, "avg": 1.3041, "p75": 1.3942, "recent": 1.3618}, "22": {"p25": 1.2446, "avg": 1.3179, "p75": 1.3836, "recent": 1.3415}, "23": {"p25": 1.2345, "avg": 1.3587, "p75": 1.4475, "recent": 1.4299}, "24": {"p25": 1.3831, "avg": 1.4195, "p75": 1.5015, "recent": 1.4787}, "26": {"p25": 1.3837, "avg": 1.4708, "p75": 1.572, "recent": 1.5077}, "27": {"p25": 1.431, "avg": 1.5143, "p75": 1.6183, "recent": 1.5719}, "28": {"p25": 1.4007, "avg": 1.5376, "p75": 1.6664, "recent": 1.6485}, "29": {"p25": 1.4676, "avg": 1.5627, "p75": 1.688, "recent": 1.6104}, "30": {"p25": 1.5621, "avg": 1.6316, "p75": 1.7205, "recent": 1.7007}, "31": {"p25": 1.6341, "avg": 1.7015, "p75": 1.7736, "recent": 1.7015}, "18": {"p25": 1.1423, "avg": 1.1891, "p75": 1.2316, "recent": 1.2252}, "25": {"p25": 1.305, "avg": 1.4401, "p75": 1.5391, "recent": 1.5228}}, "15": {"15": {"p25": 1.0, "avg": 1.0, "p75": 1.0, "recent": 1.0}, "16": {"p25": 1.0535, "avg": 1.0583, "p75": 1.0731, "recent": 1.0583}, "17": {"p25": 1.0819, "avg": 1.1021, "p75": 1.1276, "recent": 1.1126}, "19": {"p25": 1.1457, "avg": 1.1766, "p75": 1.2053, "recent": 1.1766}, "20": {"p25": 1.1999, "avg": 1.2066, "p75": 1.2343, "recent": 1.2066}, "21": {"p25": 1.2123, "avg": 1.2407, "p75": 1.2731, "recent": 1.2407}, "22": {"p25": 1.2508, "avg": 1.2569, "p75": 1.298, "recent": 1.2813}, "23": {"p25": 1.2826, "avg": 1.2982, "p75": 1.3571, "recent": 1.2982}, "24": {"p25": 1.3075, "avg": 1.3432, "p75": 1.4118, "recent": 1.3723}, "26": {"p25": 1.4034, "avg": 1.4363, "p75": 1.4915, "recent": 1.4363}, "27": {"p25": 1.404, "avg": 1.4385, "p75": 1.5288, "recent": 1.4385}, "28": {"p25": 1.4305, "avg": 1.4806, "p75": 1.5728, "recent": 1.4806}, "29": {"p25": 1.4642, "avg": 1.5202, "p75": 1.6162, "recent": 1.5581}, "30": {"p25": 1.5094, "avg": 1.5672, "p75": 1.6579, "recent": 1.6016}, "31": {"p25": 1.5001, "avg": 1.5391, "p75": 1.5941, "recent": 1.5391}, "18": {"p25": 1.1093, "avg": 1.143, "p75": 1.1642, "recent": 1.143}, "25": {"p25": 1.3533, "avg": 1.4, "p75": 1.4919, "recent": 1.4}}, "16": {"16": {"p25": 1.0, "avg": 1.0, "p75": 1.0, "recent": 1.0}, "17": {"p25": 1.0393, "avg": 1.0537, "p75": 1.0758, "recent": 1.0693}, "19": {"p25": 1.0877, "avg": 1.1198, "p75": 1.1736, "recent": 1.1482}, "20": {"p25": 1.1297, "avg": 1.1564, "p75": 1.1668, "recent": 1.1867}, "21": {"p25": 1.1464, "avg": 1.2015, "p75": 1.2594, "recent": 1.2336}, "22": {"p25": 1.1533, "avg": 1.1842, "p75": 1.2073, "recent": 1.2117}, "23": {"p25": 1.1851, "avg": 1.2416, "p75": 1.3185, "recent": 1.3023}, "24": {"p25": 1.239, "avg": 1.2978, "p75": 1.3598, "recent": 1.3587}, "26": {"p25": 1.2832, "avg": 1.3633, "p75": 1.4539, "recent": 1.4058}, "27": {"p25": 1.3234, "avg": 1.385, "p75": 1.4772, "recent": 1.4472}, "28": {"p25": 1.3132, "avg": 1.4111, "p75": 1.5165, "recent": 1.5081}, "29": {"p25": 1.3202, "avg": 1.4033, "p75": 1.5095, "recent": 1.4586}, "30": {"p25": 1.3821, "avg": 1.4752, "p75": 1.6082, "recent": 1.5426}, "31": {"p25": 1.4277, "avg": 1.5206, "p75": 1.5723, "recent": 1.5206}, "18": {"p25": 1.0715, "avg": 1.0971, "p75": 1.1329, "recent": 1.1169}, "25": {"p25": 1.2774, "avg": 1.3371, "p75": 1.4163, "recent": 1.4041}}, "17": {"17": {"p25": 1.0, "avg": 1.0, "p75": 1.0, "recent": 1.0}, "19": {"p25": 1.0749, "avg": 1.0767, "p75": 1.0987, "recent": 1.0891}, "20": {"p25": 1.0808, "avg": 1.1124, "p75": 1.1276, "recent": 1.1328}, "21": {"p25": 1.109, "avg": 1.1466, "p75": 1.1786, "recent": 1.1679}, "22": {"p25": 1.1319, "avg": 1.1415, "p75": 1.1852, "recent": 1.1706}, "23": {"p25": 1.1473, "avg": 1.1829, "p75": 1.231, "recent": 1.2255}, "24": {"p25": 1.2075, "avg": 1.2331, "p75": 1.2714, "recent": 1.2828}, "26": {"p25": 1.2556, "avg": 1.3205, "p75": 1.3678, "recent": 1.3539}, "27": {"p25": 1.2869, "avg": 1.325, "p75": 1.3862, "recent": 1.3878}, "28": {"p25": 1.3081, "avg": 1.3667, "p75": 1.4505, "recent": 1.4406}, "29": {"p25": 1.3086, "avg": 1.3793, "p75": 1.4646, "recent": 1.4297}, "30": {"p25": 1.3265, "avg": 1.4163, "p75": 1.4913, "recent": 1.4895}, "31": {"p25": 1.3621, "avg": 1.4354, "p75": 1.4798, "recent": 1.4354}, "18": {"p25": 1.0403, "avg": 1.0434, "p75": 1.0505, "recent": 1.0499}, "25": {"p25": 1.2608, "avg": 1.2855, "p75": 1.311, "recent": 1.3289}}, "19": {"19": {"p25": 1.0, "avg": 1.0, "p75": 1.0, "recent": 1.0}, "20": {"p25": 1.0294, "avg": 1.0381, "p75": 1.0484, "recent": 1.0472}, "21": {"p25": 1.0533, "avg": 1.0695, "p75": 1.0875, "recent": 1.084}, "22": {"p25": 1.0778, "avg": 1.0933, "p75": 1.1155, "recent": 1.1012}, "23": {"p25": 1.0926, "avg": 1.1193, "p75": 1.1429, "recent": 1.1422}, "24": {"p25": 1.1353, "avg": 1.1617, "p75": 1.1915, "recent": 1.184}, "26": {"p25": 1.1683, "avg": 1.2166, "p75": 1.2588, "recent": 1.2473}, "27": {"p25": 1.1992, "avg": 1.2531, "p75": 1.2927, "recent": 1.2769}, "28": {"p25": 1.208, "avg": 1.2793, "p75": 1.3509, "recent": 1.3216}, "29": {"p25": 1.2229, "avg": 1.2993, "p75": 1.3722, "recent": 1.3128}, "30": {"p25": 1.2642, "avg": 1.3311, "p75": 1.3879, "recent": 1.3632}, "31": {"p25": 1.3153, "avg": 1.366, "p75": 1.4411, "recent": 1.366}, "25": {"p25": 1.1749, "avg": 1.2056, "p75": 1.2244, "recent": 1.2211}}, "20": {"20": {"p25": 1.0, "avg": 1.0, "p75": 1.0, "recent": 1.0}, "21": {"p25": 1.0225, "avg": 1.0338, "p75": 1.0506, "recent": 1.0425}, "22": {"p25": 1.0419, "avg": 1.0611, "p75": 1.0772, "recent": 1.0661}, "23": {"p25": 1.0617, "avg": 1.0799, "p75": 1.0905, "recent": 1.0968}, "24": {"p25": 1.1006, "avg": 1.1227, "p75": 1.1369, "recent": 1.14}, "26": {"p25": 1.1275, "avg": 1.1725, "p75": 1.1975, "recent": 1.1887}, "27": {"p25": 1.1638, "avg": 1.2112, "p75": 1.2511, "recent": 1.2382}, "28": {"p25": 1.1726, "avg": 1.244, "p75": 1.3012, "recent": 1.2821}, "29": {"p25": 1.2008, "avg": 1.2768, "p75": 1.3517, "recent": 1.2914}, "30": {"p25": 1.2388, "avg": 1.3037, "p75": 1.3938, "recent": 1.3383}, "31": {"p25": 1.2739, "avg": 1.3281, "p75": 1.3791, "recent": 1.3281}, "25": {"p25": 1.135, "avg": 1.1656, "p75": 1.1839, "recent": 1.1827}}, "21": {"21": {"p25": 1.0, "avg": 1.0, "p75": 1.0, "recent": 1.0}, "22": {"p25": 1.0332, "avg": 1.0385, "p75": 1.0439, "recent": 1.0385}, "23": {"p25": 1.0297, "avg": 1.0529, "p75": 1.0778, "recent": 1.0665}, "24": {"p25": 1.0667, "avg": 1.0843, "p75": 1.1003, "recent": 1.0931}, "26": {"p25": 1.11, "avg": 1.13, "p75": 1.1444, "recent": 1.134}, "27": {"p25": 1.1512, "avg": 1.1689, "p75": 1.1775, "recent": 1.1752}, "28": {"p25": 1.1726, "avg": 1.1916, "p75": 1.2178, "recent": 1.2158}, "29": {"p25": 1.2052, "avg": 1.2318, "p75": 1.2823, "recent": 1.2318}, "30": {"p25": 1.2225, "avg": 1.2561, "p75": 1.302, "recent": 1.2735}, "31": {"p25": 1.2718, "avg": 1.3052, "p75": 1.3375, "recent": 1.3052}, "25": {"p25": 1.0904, "avg": 1.1151, "p75": 1.1379, "recent": 1.1266}}, "22": {"22": {"p25": 1.0, "avg": 1.0, "p75": 1.0, "recent": 1.0}, "23": {"p25": 1.0282, "avg": 1.0327, "p75": 1.0358, "recent": 1.0351}, "24": {"p25": 1.0518, "avg": 1.0692, "p75": 1.0769, "recent": 1.0786}, "26": {"p25": 1.0864, "avg": 1.1159, "p75": 1.1215, "recent": 1.1159}, "27": {"p25": 1.123, "avg": 1.1515, "p75": 1.1684, "recent": 1.1586}, "28": {"p25": 1.1294, "avg": 1.1645, "p75": 1.2087, "recent": 1.1878}, "29": {"p25": 1.1533, "avg": 1.1934, "p75": 1.2587, "recent": 1.2252}, "30": {"p25": 1.1959, "avg": 1.2454, "p75": 1.29, "recent": 1.2672}, "31": {"p25": 1.225, "avg": 1.2522, "p75": 1.2843, "recent": 1.2522}, "25": {"p25": 1.0791, "avg": 1.1024, "p75": 1.1235, "recent": 1.1133}}, "23": {"23": {"p25": 1.0, "avg": 1.0, "p75": 1.0, "recent": 1.0}, "24": {"p25": 1.033, "avg": 1.0408, "p75": 1.0422, "recent": 1.0505}, "26": {"p25": 1.064, "avg": 1.0851, "p75": 1.096, "recent": 1.0992}, "27": {"p25": 1.0972, "avg": 1.1192, "p75": 1.1306, "recent": 1.1343}, "28": {"p25": 1.1049, "avg": 1.1331, "p75": 1.1691, "recent": 1.1671}, "29": {"p25": 1.1206, "avg": 1.1465, "p75": 1.1696, "recent": 1.1681}, "30": {"p25": 1.1607, "avg": 1.1945, "p75": 1.199, "recent": 1.2182}, "31": {"p25": 1.1988, "avg": 1.2322, "p75": 1.2579, "recent": 1.2322}, "25": {"p25": 1.0524, "avg": 1.0688, "p75": 1.0903, "recent": 1.0855}}, "24": {"24": {"p25": 1.0, "avg": 1.0, "p75": 1.0, "recent": 1.0}, "26": {"p25": 1.0363, "avg": 1.0529, "p75": 1.0677, "recent": 1.062}, "27": {"p25": 1.0573, "avg": 1.0761, "p75": 1.0925, "recent": 1.0901}, "28": {"p25": 1.0817, "avg": 1.1061, "p75": 1.1236, "recent": 1.1253}, "29": {"p25": 1.101, "avg": 1.1289, "p75": 1.1509, "recent": 1.1422}, "30": {"p25": 1.121, "avg": 1.1562, "p75": 1.1849, "recent": 1.1837}, "31": {"p25": 1.1593, "avg": 1.1935, "p75": 1.2174, "recent": 1.1935}, "25": {"p25": 1.0281, "avg": 1.0344, "p75": 1.0414, "recent": 1.041}}, "26": {"26": {"p25": 1.0, "avg": 1.0, "p75": 1.0, "recent": 1.0}, "27": {"p25": 1.023, "avg": 1.0278, "p75": 1.0318, "recent": 1.0291}, "28": {"p25": 1.0271, "avg": 1.0441, "p75": 1.0725, "recent": 1.0575}, "29": {"p25": 1.0347, "avg": 1.0636, "p75": 1.0744, "recent": 1.0636}, "30": {"p25": 1.0665, "avg": 1.0918, "p75": 1.1096, "recent": 1.1001}, "31": {"p25": 1.1188, "avg": 1.1382, "p75": 1.1494, "recent": 1.1382}}, "27": {"27": {"p25": 1.0, "avg": 1.0, "p75": 1.0, "recent": 1.0}, "28": {"p25": 1.0232, "avg": 1.0291, "p75": 1.0385, "recent": 1.036}, "29": {"p25": 1.0465, "avg": 1.055, "p75": 1.0567, "recent": 1.0605}, "30": {"p25": 1.0695, "avg": 1.0806, "p75": 1.1, "recent": 1.0968}, "31": {"p25": 1.0966, "avg": 1.1335, "p75": 1.158, "recent": 1.1335}}, "28": {"28": {"p25": 1.0, "avg": 1.0, "p75": 1.0, "recent": 1.0}, "29": {"p25": 1.0227, "avg": 1.0289, "p75": 1.0299, "recent": 1.0314}, "30": {"p25": 1.0371, "avg": 1.0528, "p75": 1.068, "recent": 1.0668}, "31": {"p25": 1.0838, "avg": 1.1064, "p75": 1.1251, "recent": 1.1064}}, "29": {"29": {"p25": 1.0, "avg": 1.0, "p75": 1.0, "recent": 1.0}, "30": {"p25": 1.0247, "avg": 1.0319, "p75": 1.0383, "recent": 1.0378}, "31": {"p25": 1.0564, "avg": 1.0745, "p75": 1.0896, "recent": 1.0745}}, "30": {"30": {"p25": 1.0, "avg": 1.0, "p75": 1.0, "recent": 1.0}, "31": {"p25": 1.0381, "avg": 1.0489, "p75": 1.0507, "recent": 1.0489}}, "31": {"31": {"p25": 1.0, "avg": 1.0, "p75": 1.0, "recent": 1.0}}, "4": {"4": {"p25": 1.0, "avg": 1.0, "p75": 1.0, "recent": 1.0}, "5": {"p25": 1.2445, "avg": 1.3529, "p75": 1.419, "recent": 1.3915}, "6": {"p25": 1.4977, "avg": 1.5927, "p75": 1.6931, "recent": 1.7105}, "7": {"p25": 1.736, "avg": 1.9192, "p75": 2.0327, "recent": 2.0442}, "9": {"p25": 1.7992, "avg": 2.2216, "p75": 2.6122, "recent": 2.4853}, "10": {"p25": 2.0434, "avg": 2.45, "p75": 2.4068, "recent": 2.746}, "11": {"p25": 2.2575, "avg": 2.695, "p75": 2.8483, "recent": 3.0708}, "12": {"p25": 2.5532, "avg": 2.8698, "p75": 2.9746, "recent": 3.1107}, "13": {"p25": 2.5559, "avg": 3.1158, "p75": 3.4804, "recent": 3.5109}, "14": {"p25": 3.038, "avg": 3.497, "p75": 3.7666, "recent": 3.7698}, "16": {"p25": 2.9913, "avg": 3.5318, "p75": 3.7317, "recent": 3.9297}, "17": {"p25": 3.2443, "avg": 3.7232, "p75": 3.8119, "recent": 4.1518}, "18": {"p25": 3.4883, "avg": 4.0297, "p75": 3.968, "recent": 4.3788}, "19": {"p25": 3.4619, "avg": 3.9289, "p75": 4.0612, "recent": 4.2792}, "20": {"p25": 3.4474, "avg": 4.0505, "p75": 4.2496, "recent": 4.404}, "21": {"p25": 3.793, "avg": 4.4814, "p75": 4.4957, "recent": 4.6284}, "23": {"p25": 3.7488, "avg": 4.4072, "p75": 4.6759, "recent": 4.9168}, "24": {"p25": 3.9347, "avg": 4.5974, "p75": 4.836, "recent": 5.1047}, "25": {"p25": 4.2534, "avg": 4.8218, "p75": 4.972, "recent": 5.2917}, "26": {"p25": 4.0415, "avg": 4.8088, "p75": 5.1281, "recent": 5.224}, "27": {"p25": 4.1417, "avg": 5.02, "p75": 5.3462, "recent": 5.4749}, "28": {"p25": 4.5277, "avg": 5.1754, "p75": 5.555, "recent": 5.707}, "30": {"p25": 4.2548, "avg": 5.2996, "p75": 5.9615, "recent": 5.7582}, "8": {"p25": 1.6352, "avg": 1.9349, "p75": 2.3112, "recent": 2.0311}, "15": {"p25": 2.7088, "avg": 3.1435, "p75": 3.5042, "recent": 3.1435}, "22": {"p25": 3.5688, "avg": 3.9716, "p75": 4.4515, "recent": 4.1694}, "29": {"p25": 4.2866, "avg": 4.7364, "p75": 5.2257, "recent": 4.9209}, "31": {"p25": 4.7237, "avg": 6.2427, "p75": 7.146, "recent": 6.2427}}, "11": {"11": {"p25": 1.0, "avg": 1.0, "p75": 1.0, "recent": 1.0}, "12": {"p25": 1.0679, "avg": 1.0826, "p75": 1.1034, "recent": 1.0918}, "13": {"p25": 1.0949, "avg": 1.1443, "p75": 1.1823, "recent": 1.1745}, "14": {"p25": 1.1637, "avg": 1.2161, "p75": 1.2598, "recent": 1.2417}, "16": {"p25": 1.2841, "avg": 1.3102, "p75": 1.3484, "recent": 1.3391}, "17": {"p25": 1.3571, "avg": 1.3909, "p75": 1.4317, "recent": 1.4305}, "18": {"p25": 1.3701, "avg": 1.4411, "p75": 1.5262, "recent": 1.497}, "19": {"p25": 1.4171, "avg": 1.4757, "p75": 1.55, "recent": 1.5279}, "20": {"p25": 1.475, "avg": 1.5428, "p75": 1.6411, "recent": 1.6038}, "21": {"p25": 1.4965, "avg": 1.6125, "p75": 1.7257, "recent": 1.648}, "23": {"p25": 1.5264, "avg": 1.6392, "p75": 1.8071, "recent": 1.7358}, "24": {"p25": 1.6591, "avg": 1.7289, "p75": 1.8801, "recent": 1.8312}, "25": {"p25": 1.5302, "avg": 1.7693, "p75": 1.9071, "recent": 1.8969}, "26": {"p25": 1.6678, "avg": 1.8128, "p75": 1.9443, "recent": 1.8979}, "27": {"p25": 1.7116, "avg": 1.8704, "p75": 2.0364, "recent": 1.9766}, "28": {"p25": 1.6002, "avg": 1.8967, "p75": 2.1068, "recent": 2.0569}, "30": {"p25": 1.8101, "avg": 1.9854, "p75": 2.1815, "recent": 2.0984}, "15": {"p25": 1.2374, "avg": 1.2743, "p75": 1.3048, "recent": 1.2743}, "22": {"p25": 1.5153, "avg": 1.5866, "p75": 1.6919, "recent": 1.6225}, "29": {"p25": 1.6971, "avg": 1.9055, "p75": 2.1252, "recent": 1.9568}, "31": {"p25": 1.8818, "avg": 2.0172, "p75": 2.1042, "recent": 2.0172}}, "18": {"18": {"p25": 1.0, "avg": 1.0, "p75": 1.0, "recent": 1.0}, "19": {"p25": 1.0256, "avg": 1.0333, "p75": 1.0456, "recent": 1.0388}, "20": {"p25": 1.0417, "avg": 1.0646, "p75": 1.0852, "recent": 1.0717}, "21": {"p25": 1.0728, "avg": 1.1067, "p75": 1.1399, "recent": 1.1146}, "23": {"p25": 1.1171, "avg": 1.1385, "p75": 1.184, "recent": 1.1674}, "24": {"p25": 1.1636, "avg": 1.1778, "p75": 1.2133, "recent": 1.2068}, "25": {"p25": 1.17, "avg": 1.2114, "p75": 1.2516, "recent": 1.2405}, "26": {"p25": 1.1992, "avg": 1.2527, "p75": 1.2965, "recent": 1.2637}, "27": {"p25": 1.2285, "avg": 1.2683, "p75": 1.3281, "recent": 1.2947}, "28": {"p25": 1.2189, "avg": 1.2975, "p75": 1.3794, "recent": 1.3412}, "30": {"p25": 1.2747, "avg": 1.351, "p75": 1.4215, "recent": 1.3717}, "22": {"p25": 1.0953, "avg": 1.1054, "p75": 1.1442, "recent": 1.1054}, "29": {"p25": 1.2319, "avg": 1.305, "p75": 1.3633, "recent": 1.305}, "31": {"p25": 1.3426, "avg": 1.3978, "p75": 1.436, "recent": 1.3978}}, "25": {"25": {"p25": 1.0, "avg": 1.0, "p75": 1.0, "recent": 1.0}, "26": {"p25": 1.0234, "avg": 1.0272, "p75": 1.0298, "recent": 1.0296}, "27": {"p25": 1.0334, "avg": 1.0452, "p75": 1.0634, "recent": 1.0519}, "28": {"p25": 1.0482, "avg": 1.0685, "p75": 1.0954, "recent": 1.0877}, "30": {"p25": 1.1091, "avg": 1.1245, "p75": 1.1403, "recent": 1.1444}, "29": {"p25": 1.0673, "avg": 1.0912, "p75": 1.0987, "recent": 1.0986}, "31": {"p25": 1.1635, "avg": 1.1815, "p75": 1.2005, "recent": 1.1815}}, "1": {"1": {"p25": 1.0, "avg": 1.0, "p75": 1.0, "recent": 1.0}, "2": {"p25": 2.1874, "avg": 2.4796, "p75": 2.7703, "recent": 2.4796}, "3": {"p25": 3.0868, "avg": 4.8239, "p75": 4.1483, "recent": 4.8239}, "4": {"p25": 4.3326, "avg": 6.6707, "p75": 6.1499, "recent": 7.1847}, "5": {"p25": 5.9154, "avg": 6.6159, "p75": 7.3993, "recent": 6.6159}, "7": {"p25": 7.3953, "avg": 13.9083, "p75": 13.4682, "recent": 13.9083}, "8": {"p25": 8.0402, "avg": 14.0488, "p75": 12.5291, "recent": 15.5787}, "9": {"p25": 8.8482, "avg": 17.1782, "p75": 15.0783, "recent": 17.1782}, "10": {"p25": 9.5151, "avg": 17.7013, "p75": 11.7526, "recent": 17.7013}, "11": {"p25": 10.6463, "avg": 18.9661, "p75": 15.7671, "recent": 21.0791}, "12": {"p25": 11.7333, "avg": 13.0487, "p75": 14.0422, "recent": 13.0487}, "14": {"p25": 12.6589, "avg": 26.768, "p75": 23.0556, "recent": 26.768}, "15": {"p25": 13.5677, "avg": 23.944, "p75": 15.8014, "recent": 23.944}, "16": {"p25": 14.0345, "avg": 26.4866, "p75": 22.0076, "recent": 26.4866}, "17": {"p25": 15.1785, "avg": 26.3065, "p75": 17.4051, "recent": 26.3065}, "18": {"p25": 16.5581, "avg": 29.5126, "p75": 22.7501, "recent": 29.5126}, "19": {"p25": 16.4778, "avg": 17.2347, "p75": 19.2237, "recent": 17.2347}, "21": {"p25": 17.436, "avg": 19.8216, "p75": 20.4837, "recent": 19.8216}, "22": {"p25": 18.036, "avg": 28.372, "p75": 23.7903, "recent": 31.4362}, "23": {"p25": 18.6599, "avg": 30.8337, "p75": 26.2915, "recent": 30.8337}, "24": {"p25": 19.06, "avg": 30.2954, "p75": 21.3588, "recent": 30.2954}, "25": {"p25": 19.8506, "avg": 32.2898, "p75": 26.2886, "recent": 32.2898}, "26": {"p25": 20.1406, "avg": 21.026, "p75": 22.3825, "recent": 21.026}, "28": {"p25": 20.7262, "avg": 34.0894, "p75": 27.4379, "recent": 34.0894}, "29": {"p25": 21.7345, "avg": 33.3945, "p75": 26.9624, "recent": 36.7911}, "30": {"p25": 21.6761, "avg": 35.3903, "p75": 24.7019, "recent": 35.3903}, "31": {"p25": 23.5827, "avg": 52.3856, "p75": 67.6379, "recent": 52.3856}, "6": {"p25": 6.373, "avg": 10.7625, "p75": 10.5377, "recent": 10.7625}, "13": {"p25": 11.8565, "avg": 22.6033, "p75": 20.3271, "recent": 22.6033}, "20": {"p25": 16.9832, "avg": 17.7509, "p75": 19.8312, "recent": 17.7509}, "27": {"p25": 21.4923, "avg": 34.8203, "p75": 23.0805, "recent": 34.8203}}};
+const HISTORY = [{"period": "2025-05", "label": "May-25", "pts": [{"x": 2, "y": 0.4071, "act": 0.5747, "fav": 0.3866, "actNum": 2, "actDen": 348, "favNum": 11, "favDen": 2845, "consNum": 13, "consDen": 3193}, {"x": 3, "y": 0.6567, "act": 0.9901, "fav": 0.5975, "actNum": 5, "actDen": 505, "favNum": 17, "favDen": 2845, "consNum": 22, "consDen": 3350}, {"x": 5, "y": 1.0489, "act": 0.8997, "fav": 1.0896, "actNum": 7, "actDen": 778, "favNum": 31, "favDen": 2845, "consNum": 38, "consDen": 3623}, {"x": 6, "y": 1.3398, "act": 1.4656, "fav": 1.3005, "actNum": 13, "actDen": 887, "favNum": 37, "favDen": 2845, "consNum": 50, "consDen": 3732}, {"x": 7, "y": 1.5421, "act": 1.5291, "fav": 1.5466, "actNum": 15, "actDen": 981, "favNum": 44, "favDen": 2845, "consNum": 59, "consDen": 3826}, {"x": 8, "y": 1.6817, "act": 1.4925, "fav": 1.7575, "actNum": 17, "actDen": 1139, "favNum": 50, "favDen": 2845, "consNum": 67, "consDen": 3984}, {"x": 9, "y": 1.8987, "act": 1.5835, "fav": 2.0387, "actNum": 20, "actDen": 1263, "favNum": 58, "favDen": 2845, "consNum": 78, "consDen": 4108}, {"x": 10, "y": 2.1035, "act": 1.7316, "fav": 2.2847, "actNum": 24, "actDen": 1386, "favNum": 65, "favDen": 2845, "consNum": 89, "consDen": 4231}, {"x": 12, "y": 2.1681, "act": 1.7188, "fav": 2.4253, "actNum": 28, "actDen": 1629, "favNum": 69, "favDen": 2845, "consNum": 97, "consDen": 4474}, {"x": 13, "y": 2.3507, "act": 1.7857, "fav": 2.7065, "actNum": 32, "actDen": 1792, "favNum": 77, "favDen": 2845, "consNum": 109, "consDen": 4637}, {"x": 14, "y": 2.4771, "act": 1.8887, "fav": 2.8822, "actNum": 37, "actDen": 1959, "favNum": 82, "favDen": 2845, "consNum": 119, "consDen": 4804}, {"x": 15, "y": 2.6545, "act": 1.9617, "fav": 3.1634, "actNum": 41, "actDen": 2090, "favNum": 90, "favDen": 2845, "consNum": 131, "consDen": 4935}, {"x": 16, "y": 2.8621, "act": 2.0079, "fav": 3.5501, "actNum": 46, "actDen": 2291, "favNum": 101, "favDen": 2845, "consNum": 147, "consDen": 5136}, {"x": 17, "y": 3.0098, "act": 2.1854, "fav": 3.7258, "actNum": 54, "actDen": 2471, "favNum": 106, "favDen": 2845, "consNum": 160, "consDen": 5316}, {"x": 19, "y": 3.1592, "act": 2.2377, "fav": 4.0422, "actNum": 61, "actDen": 2726, "favNum": 115, "favDen": 2845, "consNum": 176, "consDen": 5571}, {"x": 20, "y": 3.1852, "act": 2.1959, "fav": 4.1828, "actNum": 63, "actDen": 2869, "favNum": 119, "favDen": 2845, "consNum": 182, "consDen": 5714}, {"x": 21, "y": 3.1844, "act": 2.1028, "fav": 4.3234, "actNum": 63, "actDen": 2996, "favNum": 123, "favDen": 2845, "consNum": 186, "consDen": 5841}, {"x": 22, "y": 3.3044, "act": 2.2243, "fav": 4.4991, "actNum": 70, "actDen": 3147, "favNum": 128, "favDen": 2845, "consNum": 198, "consDen": 5992}, {"x": 23, "y": 3.3816, "act": 2.2384, "fav": 4.71, "actNum": 74, "actDen": 3306, "favNum": 134, "favDen": 2845, "consNum": 208, "consDen": 6151}, {"x": 24, "y": 3.4917, "act": 2.3052, "fav": 4.9209, "actNum": 79, "actDen": 3427, "favNum": 140, "favDen": 2845, "consNum": 219, "consDen": 6272}, {"x": 26, "y": 3.5808, "act": 2.2565, "fav": 5.2724, "actNum": 82, "actDen": 3634, "favNum": 150, "favDen": 2845, "consNum": 232, "consDen": 6479}, {"x": 27, "y": 3.6914, "act": 2.3639, "fav": 5.4482, "actNum": 89, "actDen": 3765, "favNum": 155, "favDen": 2845, "consNum": 244, "consDen": 6610}, {"x": 28, "y": 3.735, "act": 2.3578, "fav": 5.6239, "actNum": 92, "actDen": 3902, "favNum": 160, "favDen": 2845, "consNum": 252, "consDen": 6747}, {"x": 29, "y": 3.8484, "act": 2.3262, "fav": 6.0105, "actNum": 94, "actDen": 4041, "favNum": 171, "favDen": 2845, "consNum": 265, "consDen": 6886}, {"x": 30, "y": 3.9559, "act": 2.3959, "fav": 6.2214, "actNum": 99, "actDen": 4132, "favNum": 177, "favDen": 2845, "consNum": 276, "consDen": 6977}, {"x": 31, "y": 4.048, "act": 2.4028, "fav": 6.5026, "actNum": 102, "actDen": 4245, "favNum": 185, "favDen": 2845, "consNum": 287, "consDen": 7090}], "monthEnd": 4.048}, {"period": "2025-06", "label": "Jun-25", "pts": [{"x": 2, "y": 0.3412, "act": 1.444, "fav": 0.2375, "actNum": 4, "actDen": 277, "favNum": 7, "favDen": 2947, "consNum": 11, "consDen": 3224}, {"x": 3, "y": 0.6011, "act": 2.1053, "fav": 0.4072, "actNum": 8, "actDen": 380, "favNum": 12, "favDen": 2947, "consNum": 20, "consDen": 3327}, {"x": 4, "y": 1.1032, "act": 2.7027, "fav": 0.8823, "actNum": 11, "actDen": 407, "favNum": 26, "favDen": 2947, "consNum": 37, "consDen": 3354}, {"x": 5, "y": 1.4108, "act": 2.3451, "fav": 1.2216, "actNum": 14, "actDen": 597, "favNum": 36, "favDen": 2947, "consNum": 50, "consDen": 3544}, {"x": 6, "y": 1.803, "act": 2.3407, "fav": 1.6627, "actNum": 18, "actDen": 769, "favNum": 49, "favDen": 2947, "consNum": 67, "consDen": 3716}, {"x": 7, "y": 2.2069, "act": 2.7027, "fav": 2.0699, "actNum": 22, "actDen": 814, "favNum": 61, "favDen": 2947, "consNum": 83, "consDen": 3761}, {"x": 9, "y": 2.378, "act": 2.6502, "fav": 2.2735, "actNum": 30, "actDen": 1132, "favNum": 67, "favDen": 2947, "consNum": 97, "consDen": 4079}, {"x": 10, "y": 2.6551, "act": 2.5974, "fav": 2.6807, "actNum": 34, "actDen": 1309, "favNum": 79, "favDen": 2947, "consNum": 113, "consDen": 4256}, {"x": 11, "y": 2.951, "act": 2.6212, "fav": 3.1218, "actNum": 40, "actDen": 1526, "favNum": 92, "favDen": 2947, "consNum": 132, "consDen": 4473}, {"x": 12, "y": 3.0782, "act": 2.5997, "fav": 3.3593, "actNum": 45, "actDen": 1731, "favNum": 99, "favDen": 2947, "consNum": 144, "consDen": 4678}, {"x": 13, "y": 3.2291, "act": 2.6632, "fav": 3.5969, "actNum": 51, "actDen": 1915, "favNum": 106, "favDen": 2947, "consNum": 157, "consDen": 4862}, {"x": 14, "y": 3.4551, "act": 2.8243, "fav": 3.9023, "actNum": 59, "actDen": 2089, "favNum": 115, "favDen": 2947, "consNum": 174, "consDen": 5036}, {"x": 16, "y": 3.5299, "act": 2.7322, "fav": 4.1737, "actNum": 65, "actDen": 2379, "favNum": 123, "favDen": 2947, "consNum": 188, "consDen": 5326}, {"x": 17, "y": 3.6334, "act": 2.6877, "fav": 4.4452, "actNum": 68, "actDen": 2530, "favNum": 131, "favDen": 2947, "consNum": 199, "consDen": 5477}, {"x": 18, "y": 3.8482, "act": 2.786, "fav": 4.8185, "actNum": 75, "actDen": 2692, "favNum": 142, "favDen": 2947, "consNum": 217, "consDen": 5639}, {"x": 19, "y": 3.9091, "act": 2.7273, "fav": 5.056, "actNum": 78, "actDen": 2860, "favNum": 149, "favDen": 2947, "consNum": 227, "consDen": 5807}, {"x": 20, "y": 4.0652, "act": 2.8609, "fav": 5.2935, "actNum": 86, "actDen": 3006, "favNum": 156, "favDen": 2947, "consNum": 242, "consDen": 5953}, {"x": 21, "y": 4.1299, "act": 2.7682, "fav": 5.5989, "actNum": 88, "actDen": 3179, "favNum": 165, "favDen": 2947, "consNum": 253, "consDen": 6126}, {"x": 23, "y": 4.1356, "act": 2.726, "fav": 5.8025, "actNum": 95, "actDen": 3485, "favNum": 171, "favDen": 2947, "consNum": 266, "consDen": 6432}, {"x": 24, "y": 4.3406, "act": 2.8556, "fav": 6.1758, "actNum": 104, "actDen": 3642, "favNum": 182, "favDen": 2947, "consNum": 286, "consDen": 6589}, {"x": 25, "y": 4.509, "act": 2.8722, "fav": 6.6169, "actNum": 109, "actDen": 3795, "favNum": 195, "favDen": 2947, "consNum": 304, "consDen": 6742}, {"x": 26, "y": 4.5671, "act": 2.8953, "fav": 6.8205, "actNum": 115, "actDen": 3972, "favNum": 201, "favDen": 2947, "consNum": 316, "consDen": 6919}, {"x": 27, "y": 4.6716, "act": 3.0119, "fav": 6.9902, "actNum": 124, "actDen": 4117, "favNum": 206, "favDen": 2947, "consNum": 330, "consDen": 7064}, {"x": 28, "y": 4.7223, "act": 2.9715, "fav": 7.2616, "actNum": 127, "actDen": 4274, "favNum": 214, "favDen": 2947, "consNum": 341, "consDen": 7221}, {"x": 30, "y": 4.7581, "act": 2.9464, "fav": 7.5331, "actNum": 133, "actDen": 4514, "favNum": 222, "favDen": 2947, "consNum": 355, "consDen": 7461}], "monthEnd": 4.7581}, {"period": "2025-07", "label": "Jul-25", "pts": [{"x": 1, "y": 0.2413, "act": 0.8475, "fav": 0.1948, "actNum": 2, "actDen": 236, "favNum": 6, "favDen": 3080, "consNum": 8, "consDen": 3316}, {"x": 2, "y": 0.6683, "act": 1.3699, "fav": 0.5519, "actNum": 7, "actDen": 511, "favNum": 17, "favDen": 3080, "consNum": 24, "consDen": 3591}, {"x": 3, "y": 0.885, "act": 1.3123, "fav": 0.7792, "actNum": 10, "actDen": 762, "favNum": 24, "favDen": 3080, "consNum": 34, "consDen": 3842}, {"x": 4, "y": 1.08, "act": 1.3078, "fav": 1.0065, "actNum": 13, "actDen": 994, "favNum": 31, "favDen": 3080, "consNum": 44, "consDen": 4074}, {"x": 5, "y": 1.554, "act": 1.7995, "fav": 1.461, "actNum": 21, "actDen": 1167, "favNum": 45, "favDen": 3080, "consNum": 66, "consDen": 4247}, {"x": 7, "y": 1.7842, "act": 1.715, "fav": 1.8182, "actNum": 26, "actDen": 1516, "favNum": 56, "favDen": 3080, "consNum": 82, "consDen": 4596}, {"x": 8, "y": 1.9387, "act": 1.8055, "fav": 2.013, "actNum": 31, "actDen": 1717, "favNum": 62, "favDen": 3080, "consNum": 93, "consDen": 4797}, {"x": 9, "y": 2.2168, "act": 1.9129, "fav": 2.4026, "actNum": 36, "actDen": 1882, "favNum": 74, "favDen": 3080, "consNum": 110, "consDen": 4962}, {"x": 10, "y": 2.5044, "act": 2.1597, "fav": 2.7273, "actNum": 43, "actDen": 1991, "favNum": 84, "favDen": 3080, "consNum": 127, "consDen": 5071}, {"x": 11, "y": 2.6192, "act": 2.1554, "fav": 2.9545, "actNum": 48, "actDen": 2227, "favNum": 91, "favDen": 3080, "consNum": 139, "consDen": 5307}, {"x": 12, "y": 2.8307, "act": 2.3447, "fav": 3.2143, "actNum": 57, "actDen": 2431, "favNum": 99, "favDen": 3080, "consNum": 156, "consDen": 5511}, {"x": 14, "y": 2.9764, "act": 2.2415, "fav": 3.6364, "actNum": 62, "actDen": 2766, "favNum": 112, "favDen": 3080, "consNum": 174, "consDen": 5846}, {"x": 15, "y": 3.2578, "act": 2.2919, "fav": 4.1883, "actNum": 68, "actDen": 2967, "favNum": 129, "favDen": 3080, "consNum": 197, "consDen": 6047}, {"x": 16, "y": 3.344, "act": 2.3028, "fav": 4.4156, "actNum": 73, "actDen": 3170, "favNum": 136, "favDen": 3080, "consNum": 209, "consDen": 6250}, {"x": 17, "y": 3.613, "act": 2.4636, "fav": 4.8701, "actNum": 83, "actDen": 3369, "favNum": 150, "favDen": 3080, "consNum": 233, "consDen": 6449}, {"x": 18, "y": 3.771, "act": 2.5447, "fav": 5.1948, "actNum": 91, "actDen": 3576, "favNum": 160, "favDen": 3080, "consNum": 251, "consDen": 6656}, {"x": 19, "y": 3.9754, "act": 2.7562, "fav": 5.4545, "actNum": 103, "actDen": 3737, "favNum": 168, "favDen": 3080, "consNum": 271, "consDen": 6817}, {"x": 21, "y": 4.1497, "act": 2.7798, "fav": 5.9416, "actNum": 112, "actDen": 4029, "favNum": 183, "favDen": 3080, "consNum": 295, "consDen": 7109}, {"x": 22, "y": 4.3407, "act": 2.8416, "fav": 6.3961, "actNum": 120, "actDen": 4223, "favNum": 197, "favDen": 3080, "consNum": 317, "consDen": 7303}, {"x": 23, "y": 4.4858, "act": 2.9398, "fav": 6.6883, "actNum": 129, "actDen": 4388, "favNum": 206, "favDen": 3080, "consNum": 335, "consDen": 7468}, {"x": 24, "y": 4.5532, "act": 2.9367, "fav": 6.9481, "actNum": 134, "actDen": 4563, "favNum": 214, "favDen": 3080, "consNum": 348, "consDen": 7643}, {"x": 25, "y": 4.721, "act": 3.0965, "fav": 7.2078, "actNum": 146, "actDen": 4715, "favNum": 222, "favDen": 3080, "consNum": 368, "consDen": 7795}, {"x": 26, "y": 4.859, "act": 3.125, "fav": 7.5974, "actNum": 152, "actDen": 4864, "favNum": 234, "favDen": 3080, "consNum": 386, "consDen": 7944}, {"x": 28, "y": 4.89, "act": 3.0392, "fav": 7.9545, "actNum": 155, "actDen": 5100, "favNum": 245, "favDen": 3080, "consNum": 400, "consDen": 8180}, {"x": 29, "y": 4.997, "act": 3.0464, "fav": 8.3442, "actNum": 161, "actDen": 5285, "favNum": 257, "favDen": 3080, "consNum": 418, "consDen": 8365}, {"x": 30, "y": 5.0714, "act": 3.0781, "fav": 8.6039, "actNum": 168, "actDen": 5458, "favNum": 265, "favDen": 3080, "consNum": 433, "consDen": 8538}, {"x": 31, "y": 5.2789, "act": 3.1987, "fav": 9.0584, "actNum": 179, "actDen": 5596, "favNum": 279, "favDen": 3080, "consNum": 458, "consDen": 8676}], "monthEnd": 5.2789}, {"period": "2025-08", "label": "Aug-25", "pts": [{"x": 1, "y": 0.1718, "act": 0.0, "fav": 0.1839, "actNum": 0, "actDen": 229, "favNum": 6, "favDen": 3263, "consNum": 6, "consDen": 3492}, {"x": 2, "y": 0.487, "act": 1.1547, "fav": 0.3984, "actNum": 5, "actDen": 433, "favNum": 13, "favDen": 3263, "consNum": 18, "consDen": 3696}, {"x": 4, "y": 1.0867, "act": 1.2723, "fav": 1.042, "actNum": 10, "actDen": 786, "favNum": 34, "favDen": 3263, "consNum": 44, "consDen": 4049}, {"x": 5, "y": 1.5276, "act": 2.0161, "fav": 1.3791, "actNum": 20, "actDen": 992, "favNum": 45, "favDen": 3263, "consNum": 65, "consDen": 4255}, {"x": 6, "y": 1.9016, "act": 1.9056, "fav": 1.9001, "actNum": 23, "actDen": 1207, "favNum": 62, "favDen": 3263, "consNum": 85, "consDen": 4470}, {"x": 7, "y": 2.3141, "act": 2.208, "fav": 2.3598, "actNum": 31, "actDen": 1404, "favNum": 77, "favDen": 3263, "consNum": 108, "consDen": 4667}, {"x": 8, "y": 2.6452, "act": 2.2843, "fav": 2.8195, "actNum": 36, "actDen": 1576, "favNum": 92, "favDen": 3263, "consNum": 128, "consDen": 4839}, {"x": 9, "y": 2.8386, "act": 2.3367, "fav": 3.0953, "actNum": 39, "actDen": 1669, "favNum": 101, "favDen": 3263, "consNum": 140, "consDen": 4932}, {"x": 11, "y": 3.1579, "act": 2.4638, "fav": 3.555, "actNum": 46, "actDen": 1867, "favNum": 116, "favDen": 3263, "consNum": 162, "consDen": 5130}, {"x": 12, "y": 3.5025, "act": 2.5048, "fav": 4.1373, "actNum": 52, "actDen": 2076, "favNum": 135, "favDen": 3263, "consNum": 187, "consDen": 5339}, {"x": 13, "y": 3.7821, "act": 2.6072, "fav": 4.597, "actNum": 59, "actDen": 2263, "favNum": 150, "favDen": 3263, "consNum": 209, "consDen": 5526}, {"x": 14, "y": 3.9614, "act": 2.6208, "fav": 4.9648, "actNum": 64, "actDen": 2442, "favNum": 162, "favDen": 3263, "consNum": 226, "consDen": 5705}, {"x": 16, "y": 4.0552, "act": 2.5, "fav": 5.3325, "actNum": 67, "actDen": 2680, "favNum": 174, "favDen": 3263, "consNum": 241, "consDen": 5943}, {"x": 18, "y": 4.1485, "act": 2.4898, "fav": 5.639, "actNum": 73, "actDen": 2932, "favNum": 184, "favDen": 3263, "consNum": 257, "consDen": 6195}, {"x": 19, "y": 4.1005, "act": 2.4178, "fav": 5.7003, "actNum": 75, "actDen": 3102, "favNum": 186, "favDen": 3263, "consNum": 261, "consDen": 6365}, {"x": 20, "y": 4.2381, "act": 2.4137, "fav": 6.068, "actNum": 79, "actDen": 3273, "favNum": 198, "favDen": 3263, "consNum": 277, "consDen": 6536}, {"x": 21, "y": 4.4484, "act": 2.5029, "fav": 6.4971, "actNum": 86, "actDen": 3436, "favNum": 212, "favDen": 3263, "consNum": 298, "consDen": 6699}, {"x": 22, "y": 4.6621, "act": 2.7027, "fav": 6.7729, "actNum": 95, "actDen": 3515, "favNum": 221, "favDen": 3263, "consNum": 316, "consDen": 6778}, {"x": 23, "y": 4.8203, "act": 2.7823, "fav": 7.11, "actNum": 102, "actDen": 3666, "favNum": 232, "favDen": 3263, "consNum": 334, "consDen": 6929}, {"x": 25, "y": 4.8322, "act": 2.782, "fav": 7.2939, "actNum": 109, "actDen": 3918, "favNum": 238, "favDen": 3263, "consNum": 347, "consDen": 7181}, {"x": 26, "y": 4.9485, "act": 2.796, "fav": 7.6617, "actNum": 115, "actDen": 4113, "favNum": 250, "favDen": 3263, "consNum": 365, "consDen": 7376}, {"x": 28, "y": 4.9533, "act": 2.7647, "fav": 7.9375, "actNum": 123, "actDen": 4449, "favNum": 259, "favDen": 3263, "consNum": 382, "consDen": 7712}, {"x": 29, "y": 5.0577, "act": 2.8534, "fav": 8.1827, "actNum": 132, "actDen": 4626, "favNum": 267, "favDen": 3263, "consNum": 399, "consDen": 7889}], "monthEnd": 5.0577}, {"period": "2025-09", "label": "Sep-25", "pts": [{"x": 1, "y": 0.3529, "act": 1.0417, "fav": 0.2945, "actNum": 3, "actDen": 288, "favNum": 10, "favDen": 3396, "consNum": 13, "consDen": 3684}, {"x": 2, "y": 0.6874, "act": 0.5639, "fav": 0.7067, "actNum": 3, "actDen": 532, "favNum": 24, "favDen": 3396, "consNum": 27, "consDen": 3928}, {"x": 3, "y": 1.0209, "act": 0.9804, "fav": 1.0306, "actNum": 8, "actDen": 816, "favNum": 35, "favDen": 3396, "consNum": 43, "consDen": 4212}, {"x": 4, "y": 1.2655, "act": 0.9025, "fav": 1.384, "actNum": 10, "actDen": 1108, "favNum": 47, "favDen": 3396, "consNum": 57, "consDen": 4504}, {"x": 5, "y": 1.5642, "act": 1.2734, "fav": 1.6784, "actNum": 17, "actDen": 1335, "favNum": 57, "favDen": 3396, "consNum": 74, "consDen": 4731}, {"x": 6, "y": 1.6623, "act": 1.3012, "fav": 1.8257, "actNum": 20, "actDen": 1537, "favNum": 62, "favDen": 3396, "consNum": 82, "consDen": 4933}, {"x": 8, "y": 1.7183, "act": 1.2105, "fav": 2.0024, "actNum": 23, "actDen": 1900, "favNum": 68, "favDen": 3396, "consNum": 91, "consDen": 5296}, {"x": 9, "y": 1.883, "act": 1.2224, "fav": 2.2968, "actNum": 26, "actDen": 2127, "favNum": 78, "favDen": 3396, "consNum": 104, "consDen": 5523}, {"x": 10, "y": 2.0419, "act": 1.3282, "fav": 2.5324, "actNum": 31, "actDen": 2334, "favNum": 86, "favDen": 3396, "consNum": 117, "consDen": 5730}, {"x": 11, "y": 2.2189, "act": 1.4493, "fav": 2.7974, "actNum": 37, "actDen": 2553, "favNum": 95, "favDen": 3396, "consNum": 132, "consDen": 5949}, {"x": 12, "y": 2.4601, "act": 1.6047, "fav": 3.1508, "actNum": 44, "actDen": 2742, "favNum": 107, "favDen": 3396, "consNum": 151, "consDen": 6138}, {"x": 13, "y": 2.6233, "act": 1.7394, "fav": 3.3863, "actNum": 51, "actDen": 2932, "favNum": 115, "favDen": 3396, "consNum": 166, "consDen": 6328}, {"x": 15, "y": 2.8042, "act": 1.7918, "fav": 3.7691, "actNum": 58, "actDen": 3237, "favNum": 128, "favDen": 3396, "consNum": 186, "consDen": 6633}, {"x": 16, "y": 2.9537, "act": 1.848, "fav": 4.0636, "actNum": 63, "actDen": 3409, "favNum": 138, "favDen": 3396, "consNum": 201, "consDen": 6805}, {"x": 17, "y": 2.987, "act": 1.7773, "fav": 4.2697, "actNum": 64, "actDen": 3601, "favNum": 145, "favDen": 3396, "consNum": 209, "consDen": 6997}, {"x": 19, "y": 3.2127, "act": 1.8943, "fav": 4.7703, "actNum": 76, "actDen": 4012, "favNum": 162, "favDen": 3396, "consNum": 238, "consDen": 7408}, {"x": 20, "y": 3.3681, "act": 2.012, "fav": 5.0353, "actNum": 84, "actDen": 4175, "favNum": 171, "favDen": 3396, "consNum": 255, "consDen": 7571}, {"x": 22, "y": 3.5241, "act": 2.1059, "fav": 5.4476, "actNum": 97, "actDen": 4606, "favNum": 185, "favDen": 3396, "consNum": 282, "consDen": 8002}, {"x": 23, "y": 3.6701, "act": 2.1605, "fav": 5.8304, "actNum": 105, "actDen": 4860, "favNum": 198, "favDen": 3396, "consNum": 303, "consDen": 8256}, {"x": 24, "y": 4.0009, "act": 2.2651, "fav": 6.596, "actNum": 115, "actDen": 5077, "favNum": 224, "favDen": 3396, "consNum": 339, "consDen": 8473}, {"x": 25, "y": 4.1835, "act": 2.4048, "fav": 6.9494, "actNum": 127, "actDen": 5281, "favNum": 236, "favDen": 3396, "consNum": 363, "consDen": 8677}, {"x": 26, "y": 4.2786, "act": 2.4167, "fav": 7.2733, "actNum": 132, "actDen": 5462, "favNum": 247, "favDen": 3396, "consNum": 379, "consDen": 8858}, {"x": 27, "y": 4.3632, "act": 2.4395, "fav": 7.5677, "actNum": 138, "actDen": 5657, "favNum": 257, "favDen": 3396, "consNum": 395, "consDen": 9053}, {"x": 28, "y": 4.4643, "act": 2.4879, "fav": 7.8327, "actNum": 144, "actDen": 5788, "favNum": 266, "favDen": 3396, "consNum": 410, "consDen": 9184}, {"x": 29, "y": 4.5927, "act": 2.6241, "fav": 8.0389, "actNum": 156, "actDen": 5945, "favNum": 273, "favDen": 3396, "consNum": 429, "consDen": 9341}, {"x": 30, "y": 4.7679, "act": 2.6792, "fav": 8.51, "actNum": 163, "actDen": 6084, "favNum": 289, "favDen": 3396, "consNum": 452, "consDen": 9480}], "monthEnd": 4.7679}, {"period": "2025-10", "label": "Oct-25", "pts": [{"x": 1, "y": 0.0529, "act": 0.0, "fav": 0.0561, "actNum": 0, "actDen": 219, "favNum": 2, "favDen": 3563, "consNum": 2, "consDen": 3782}, {"x": 3, "y": 0.6261, "act": 0.339, "fav": 0.6736, "actNum": 2, "actDen": 590, "favNum": 24, "favDen": 3563, "consNum": 26, "consDen": 4153}, {"x": 4, "y": 0.9137, "act": 0.9816, "fav": 0.8981, "actNum": 8, "actDen": 815, "favNum": 32, "favDen": 3563, "consNum": 40, "consDen": 4378}, {"x": 6, "y": 1.4079, "act": 1.3378, "fav": 1.4314, "actNum": 16, "actDen": 1196, "favNum": 51, "favDen": 3563, "consNum": 67, "consDen": 4759}, {"x": 7, "y": 1.7657, "act": 1.3371, "fav": 1.9366, "actNum": 19, "actDen": 1421, "favNum": 69, "favDen": 3563, "consNum": 88, "consDen": 4984}, {"x": 8, "y": 2.2828, "act": 1.6189, "fav": 2.5821, "actNum": 26, "actDen": 1606, "favNum": 92, "favDen": 3563, "consNum": 118, "consDen": 5169}, {"x": 9, "y": 2.7783, "act": 1.8707, "fav": 3.2276, "actNum": 33, "actDen": 1764, "favNum": 115, "favDen": 3563, "consNum": 148, "consDen": 5327}, {"x": 10, "y": 3.0898, "act": 1.8051, "fav": 3.7889, "actNum": 35, "actDen": 1939, "favNum": 135, "favDen": 3563, "consNum": 170, "consDen": 5502}, {"x": 11, "y": 3.3029, "act": 1.8788, "fav": 4.1538, "actNum": 40, "actDen": 2129, "favNum": 148, "favDen": 3563, "consNum": 188, "consDen": 5692}, {"x": 13, "y": 3.5076, "act": 1.9389, "fav": 4.5748, "actNum": 47, "actDen": 2424, "favNum": 163, "favDen": 3563, "consNum": 210, "consDen": 5987}, {"x": 14, "y": 3.7736, "act": 2.0116, "fav": 5.0519, "actNum": 52, "actDen": 2585, "favNum": 180, "favDen": 3563, "consNum": 232, "consDen": 6148}, {"x": 15, "y": 4.0797, "act": 2.0645, "fav": 5.6413, "actNum": 57, "actDen": 2761, "favNum": 201, "favDen": 3563, "consNum": 258, "consDen": 6324}, {"x": 16, "y": 4.2996, "act": 2.2215, "fav": 6.0062, "actNum": 65, "actDen": 2926, "favNum": 214, "favDen": 3563, "consNum": 279, "consDen": 6489}, {"x": 17, "y": 4.4823, "act": 2.3506, "fav": 6.3149, "actNum": 72, "actDen": 3063, "favNum": 225, "favDen": 3563, "consNum": 297, "consDen": 6626}, {"x": 18, "y": 4.5254, "act": 2.3127, "fav": 6.5394, "actNum": 75, "actDen": 3243, "favNum": 233, "favDen": 3563, "consNum": 308, "consDen": 6806}, {"x": 22, "y": 4.529, "act": 2.2008, "fav": 6.9043, "actNum": 80, "actDen": 3635, "favNum": 246, "favDen": 3563, "consNum": 326, "consDen": 7198}, {"x": 23, "y": 4.6585, "act": 2.2624, "fav": 7.185, "actNum": 85, "actDen": 3757, "favNum": 256, "favDen": 3563, "consNum": 341, "consDen": 7320}, {"x": 24, "y": 4.7676, "act": 2.3053, "fav": 7.4656, "actNum": 90, "actDen": 3904, "favNum": 266, "favDen": 3563, "consNum": 356, "consDen": 7467}, {"x": 25, "y": 4.9027, "act": 2.4475, "fav": 7.6901, "actNum": 99, "actDen": 4045, "favNum": 274, "favDen": 3563, "consNum": 373, "consDen": 7608}, {"x": 27, "y": 5.0229, "act": 2.4645, "fav": 8.1111, "actNum": 106, "actDen": 4301, "favNum": 289, "favDen": 3563, "consNum": 395, "consDen": 7864}, {"x": 28, "y": 5.1519, "act": 2.5259, "fav": 8.4199, "actNum": 112, "actDen": 4434, "favNum": 300, "favDen": 3563, "consNum": 412, "consDen": 7997}, {"x": 29, "y": 5.2761, "act": 2.6489, "fav": 8.6444, "actNum": 121, "actDen": 4568, "favNum": 308, "favDen": 3563, "consNum": 429, "consDen": 8131}, {"x": 30, "y": 5.5515, "act": 2.816, "fav": 9.1777, "actNum": 133, "actDen": 4723, "favNum": 327, "favDen": 3563, "consNum": 460, "consDen": 8286}, {"x": 31, "y": 5.8166, "act": 2.9108, "fav": 9.7671, "actNum": 141, "actDen": 4844, "favNum": 348, "favDen": 3563, "consNum": 489, "consDen": 8407}], "monthEnd": 5.8166}, {"period": "2025-11", "label": "Nov-25", "pts": [{"x": 1, "y": 0.332, "act": 1.4218, "fav": 0.2699, "actNum": 3, "actDen": 211, "favNum": 10, "favDen": 3705, "consNum": 13, "consDen": 3916}, {"x": 3, "y": 0.8483, "act": 2.0408, "fav": 0.6748, "actNum": 11, "actDen": 539, "favNum": 25, "favDen": 3705, "consNum": 36, "consDen": 4244}, {"x": 4, "y": 1.3904, "act": 2.122, "fav": 1.2416, "actNum": 16, "actDen": 754, "favNum": 46, "favDen": 3705, "consNum": 62, "consDen": 4459}, {"x": 5, "y": 1.9637, "act": 2.3681, "fav": 1.8623, "actNum": 22, "actDen": 929, "favNum": 69, "favDen": 3705, "consNum": 91, "consDen": 4634}, {"x": 6, "y": 2.3542, "act": 2.6484, "fav": 2.2672, "actNum": 29, "actDen": 1095, "favNum": 84, "favDen": 3705, "consNum": 113, "consDen": 4800}, {"x": 7, "y": 2.7554, "act": 2.9203, "fav": 2.6991, "actNum": 37, "actDen": 1267, "favNum": 100, "favDen": 3705, "consNum": 137, "consDen": 4972}, {"x": 8, "y": 3.0426, "act": 2.8179, "fav": 3.1309, "actNum": 41, "actDen": 1455, "favNum": 116, "favDen": 3705, "consNum": 157, "consDen": 5160}, {"x": 10, "y": 3.3444, "act": 2.5907, "fav": 3.6977, "actNum": 45, "actDen": 1737, "favNum": 137, "favDen": 3705, "consNum": 182, "consDen": 5442}, {"x": 11, "y": 3.7149, "act": 2.6399, "fav": 4.2645, "actNum": 50, "actDen": 1894, "favNum": 158, "favDen": 3705, "consNum": 208, "consDen": 5599}, {"x": 12, "y": 4.0208, "act": 2.7603, "fav": 4.7233, "actNum": 57, "actDen": 2065, "favNum": 175, "favDen": 3705, "consNum": 232, "consDen": 5770}, {"x": 13, "y": 4.364, "act": 3.0358, "fav": 5.1552, "actNum": 67, "actDen": 2207, "favNum": 191, "favDen": 3705, "consNum": 258, "consDen": 5912}, {"x": 14, "y": 4.7903, "act": 3.4364, "fav": 5.641, "actNum": 80, "actDen": 2328, "favNum": 209, "favDen": 3705, "consNum": 289, "consDen": 6033}, {"x": 15, "y": 5.0984, "act": 3.4497, "fav": 6.2078, "actNum": 86, "actDen": 2493, "favNum": 230, "favDen": 3705, "consNum": 316, "consDen": 6198}, {"x": 17, "y": 5.3002, "act": 3.2702, "fav": 6.7746, "actNum": 88, "actDen": 2691, "favNum": 251, "favDen": 3705, "consNum": 339, "consDen": 6396}, {"x": 18, "y": 5.5173, "act": 3.3474, "fav": 7.1795, "actNum": 95, "actDen": 2838, "favNum": 266, "favDen": 3705, "consNum": 361, "consDen": 6543}, {"x": 19, "y": 5.7177, "act": 3.5536, "fav": 7.4764, "actNum": 107, "actDen": 3011, "favNum": 277, "favDen": 3705, "consNum": 384, "consDen": 6716}, {"x": 20, "y": 5.8858, "act": 3.6087, "fav": 7.8273, "actNum": 114, "actDen": 3159, "favNum": 290, "favDen": 3705, "consNum": 404, "consDen": 6864}, {"x": 21, "y": 6.2018, "act": 3.553, "fav": 8.556, "actNum": 117, "actDen": 3293, "favNum": 317, "favDen": 3705, "consNum": 434, "consDen": 6998}, {"x": 22, "y": 6.4139, "act": 3.6294, "fav": 8.9609, "actNum": 123, "actDen": 3389, "favNum": 332, "favDen": 3705, "consNum": 455, "consDen": 7094}, {"x": 24, "y": 6.6256, "act": 3.6944, "fav": 9.4737, "actNum": 133, "actDen": 3600, "favNum": 351, "favDen": 3705, "consNum": 484, "consDen": 7305}, {"x": 25, "y": 6.8998, "act": 3.807, "fav": 10.0135, "actNum": 142, "actDen": 3730, "favNum": 371, "favDen": 3705, "consNum": 513, "consDen": 7435}, {"x": 26, "y": 7.1977, "act": 4.0228, "fav": 10.4993, "actNum": 155, "actDen": 3853, "favNum": 389, "favDen": 3705, "consNum": 544, "consDen": 7558}, {"x": 27, "y": 7.3635, "act": 4.1835, "fav": 10.7692, "actNum": 166, "actDen": 3968, "favNum": 399, "favDen": 3705, "consNum": 565, "consDen": 7673}, {"x": 28, "y": 7.7239, "act": 4.2309, "fav": 11.5789, "actNum": 173, "actDen": 4089, "favNum": 429, "favDen": 3705, "consNum": 602, "consDen": 7794}, {"x": 29, "y": 8.1297, "act": 4.5802, "fav": 12.1457, "actNum": 192, "actDen": 4192, "favNum": 450, "favDen": 3705, "consNum": 642, "consDen": 7897}, {"x": 30, "y": 8.236, "act": 4.6714, "fav": 12.3347, "actNum": 199, "actDen": 4260, "favNum": 457, "favDen": 3705, "consNum": 656, "consDen": 7965}], "monthEnd": 8.236}, {"period": "2025-12", "label": "Dec-25", "pts": [{"x": 1, "y": 0.3427, "act": 1.6575, "fav": 0.2818, "actNum": 3, "actDen": 181, "favNum": 11, "favDen": 3904, "consNum": 14, "consDen": 4085}, {"x": 2, "y": 0.911, "act": 2.122, "fav": 0.7941, "actNum": 8, "actDen": 377, "favNum": 31, "favDen": 3904, "consNum": 39, "consDen": 4281}, {"x": 3, "y": 1.4745, "act": 1.9231, "fav": 1.4088, "actNum": 11, "actDen": 572, "favNum": 55, "favDen": 3904, "consNum": 66, "consDen": 4476}, {"x": 4, "y": 2.0479, "act": 2.3129, "fav": 1.998, "actNum": 17, "actDen": 735, "favNum": 78, "favDen": 3904, "consNum": 95, "consDen": 4639}, {"x": 5, "y": 2.5359, "act": 3.4179, "fav": 2.3309, "actNum": 31, "actDen": 907, "favNum": 91, "favDen": 3904, "consNum": 122, "consDen": 4811}, {"x": 6, "y": 3.0671, "act": 4.1182, "fav": 2.7664, "actNum": 46, "actDen": 1117, "favNum": 108, "favDen": 3904, "consNum": 154, "consDen": 5021}, {"x": 8, "y": 3.3117, "act": 3.7308, "fav": 3.1506, "actNum": 56, "actDen": 1501, "favNum": 123, "favDen": 3904, "consNum": 179, "consDen": 5405}, {"x": 9, "y": 3.6846, "act": 3.6173, "fav": 3.7141, "actNum": 62, "actDen": 1714, "favNum": 145, "favDen": 3904, "consNum": 207, "consDen": 5618}, {"x": 10, "y": 4.1845, "act": 3.7364, "fav": 4.4057, "actNum": 72, "actDen": 1927, "favNum": 172, "favDen": 3904, "consNum": 244, "consDen": 5831}, {"x": 11, "y": 4.5085, "act": 3.6637, "fav": 4.9693, "actNum": 78, "actDen": 2129, "favNum": 194, "favDen": 3904, "consNum": 272, "consDen": 6033}, {"x": 12, "y": 4.8125, "act": 3.8112, "fav": 5.4047, "actNum": 88, "actDen": 2309, "favNum": 211, "favDen": 3904, "consNum": 299, "consDen": 6213}, {"x": 13, "y": 5.2342, "act": 4.1497, "fav": 5.917, "actNum": 102, "actDen": 2458, "favNum": 231, "favDen": 3904, "consNum": 333, "consDen": 6362}, {"x": 15, "y": 5.466, "act": 4.2017, "fav": 6.3525, "actNum": 115, "actDen": 2737, "favNum": 248, "favDen": 3904, "consNum": 363, "consDen": 6641}, {"x": 16, "y": 5.9039, "act": 4.4148, "fav": 7.0184, "actNum": 129, "actDen": 2922, "favNum": 274, "favDen": 3904, "consNum": 403, "consDen": 6826}, {"x": 17, "y": 6.1294, "act": 4.4911, "fav": 7.4283, "actNum": 139, "actDen": 3095, "favNum": 290, "favDen": 3904, "consNum": 429, "consDen": 6999}, {"x": 18, "y": 6.3634, "act": 4.6291, "fav": 7.8125, "actNum": 151, "actDen": 3262, "favNum": 305, "favDen": 3904, "consNum": 456, "consDen": 7166}, {"x": 19, "y": 6.5883, "act": 4.66, "fav": 8.2736, "actNum": 159, "actDen": 3412, "favNum": 323, "favDen": 3904, "consNum": 482, "consDen": 7316}, {"x": 20, "y": 6.7965, "act": 4.6315, "fav": 8.7602, "actNum": 164, "actDen": 3541, "favNum": 342, "favDen": 3904, "consNum": 506, "consDen": 7445}, {"x": 22, "y": 7.0075, "act": 4.5502, "fav": 9.4006, "actNum": 173, "actDen": 3802, "favNum": 367, "favDen": 3904, "consNum": 540, "consDen": 7706}, {"x": 23, "y": 7.1982, "act": 4.5306, "fav": 9.9129, "actNum": 180, "actDen": 3973, "favNum": 387, "favDen": 3904, "consNum": 567, "consDen": 7877}, {"x": 24, "y": 7.48, "act": 4.6053, "fav": 10.502, "actNum": 189, "actDen": 4104, "favNum": 410, "favDen": 3904, "consNum": 599, "consDen": 8008}, {"x": 26, "y": 7.6709, "act": 4.6918, "fav": 10.9887, "actNum": 204, "actDen": 4348, "favNum": 429, "favDen": 3904, "consNum": 633, "consDen": 8252}, {"x": 27, "y": 7.9101, "act": 4.7968, "fav": 11.501, "actNum": 216, "actDen": 4503, "favNum": 449, "favDen": 3904, "consNum": 665, "consDen": 8407}, {"x": 29, "y": 8.0819, "act": 4.6997, "fav": 12.1926, "actNum": 223, "actDen": 4745, "favNum": 476, "favDen": 3904, "consNum": 699, "consDen": 8649}, {"x": 30, "y": 8.3552, "act": 4.7032, "fav": 12.9098, "actNum": 229, "actDen": 4869, "favNum": 504, "favDen": 3904, "consNum": 733, "consDen": 8773}, {"x": 31, "y": 8.6653, "act": 4.9177, "fav": 13.4477, "actNum": 245, "actDen": 4982, "favNum": 525, "favDen": 3904, "consNum": 770, "consDen": 8886}], "monthEnd": 8.6653}, {"period": "2026-01", "label": "Jan-26", "pts": [{"x": 2, "y": 0.7419, "act": 2.0202, "fav": 0.6504, "actNum": 6, "actDen": 297, "favNum": 27, "favDen": 4151, "consNum": 33, "consDen": 4448}, {"x": 3, "y": 1.3614, "act": 2.7273, "fav": 1.1804, "actNum": 15, "actDen": 550, "favNum": 49, "favDen": 4151, "consNum": 64, "consDen": 4701}, {"x": 5, "y": 1.8838, "act": 2.4339, "fav": 1.7586, "actNum": 23, "actDen": 945, "favNum": 73, "favDen": 4151, "consNum": 96, "consDen": 5096}, {"x": 6, "y": 2.3653, "act": 2.551, "fav": 2.3127, "actNum": 30, "actDen": 1176, "favNum": 96, "favDen": 4151, "consNum": 126, "consDen": 5327}, {"x": 7, "y": 2.9853, "act": 2.9794, "fav": 2.9872, "actNum": 39, "actDen": 1309, "favNum": 124, "favDen": 4151, "consNum": 163, "consDen": 5460}, {"x": 8, "y": 3.3351, "act": 3.1003, "fav": 3.4209, "actNum": 47, "actDen": 1516, "favNum": 142, "favDen": 4151, "consNum": 189, "consDen": 5667}, {"x": 9, "y": 3.7626, "act": 3.184, "fav": 3.999, "actNum": 54, "actDen": 1696, "favNum": 166, "favDen": 4151, "consNum": 220, "consDen": 5847}, {"x": 10, "y": 4.0545, "act": 3.2673, "fav": 4.4086, "actNum": 61, "actDen": 1867, "favNum": 183, "favDen": 4151, "consNum": 244, "consDen": 6018}, {"x": 12, "y": 4.5254, "act": 3.3775, "fav": 5.1313, "actNum": 74, "actDen": 2191, "favNum": 213, "favDen": 4151, "consNum": 287, "consDen": 6342}, {"x": 13, "y": 4.9115, "act": 3.6263, "fav": 5.6372, "actNum": 85, "actDen": 2344, "favNum": 234, "favDen": 4151, "consNum": 319, "consDen": 6495}, {"x": 14, "y": 5.26, "act": 3.8245, "fav": 6.119, "actNum": 95, "actDen": 2484, "favNum": 254, "favDen": 4151, "consNum": 349, "consDen": 6635}, {"x": 16, "y": 5.6707, "act": 4.04, "fav": 6.7695, "actNum": 113, "actDen": 2797, "favNum": 281, "favDen": 4151, "consNum": 394, "consDen": 6948}, {"x": 17, "y": 5.9277, "act": 4.1541, "fav": 7.2031, "actNum": 124, "actDen": 2985, "favNum": 299, "favDen": 4151, "consNum": 423, "consDen": 7136}, {"x": 19, "y": 6.1125, "act": 4.2025, "fav": 7.6126, "actNum": 137, "actDen": 3260, "favNum": 316, "favDen": 4151, "consNum": 453, "consDen": 7411}, {"x": 20, "y": 6.4064, "act": 4.2891, "fav": 8.1426, "actNum": 146, "actDen": 3404, "favNum": 338, "favDen": 4151, "consNum": 484, "consDen": 7555}, {"x": 21, "y": 6.5646, "act": 4.1183, "fav": 8.6967, "actNum": 149, "actDen": 3618, "favNum": 361, "favDen": 4151, "consNum": 510, "consDen": 7769}, {"x": 22, "y": 6.7803, "act": 4.139, "fav": 9.1785, "actNum": 156, "actDen": 3769, "favNum": 381, "favDen": 4151, "consNum": 537, "consDen": 7920}, {"x": 23, "y": 6.986, "act": 4.1709, "fav": 9.6362, "actNum": 163, "actDen": 3908, "favNum": 400, "favDen": 4151, "consNum": 563, "consDen": 8059}, {"x": 24, "y": 7.2832, "act": 4.2511, "fav": 10.2385, "actNum": 172, "actDen": 4046, "favNum": 425, "favDen": 4151, "consNum": 597, "consDen": 8197}, {"x": 25, "y": 7.4738, "act": 4.2328, "fav": 10.7203, "actNum": 176, "actDen": 4158, "favNum": 445, "favDen": 4151, "consNum": 621, "consDen": 8309}, {"x": 27, "y": 7.6653, "act": 4.3141, "fav": 11.2021, "actNum": 189, "actDen": 4381, "favNum": 465, "favDen": 4151, "consNum": 654, "consDen": 8532}, {"x": 28, "y": 7.9029, "act": 4.4849, "fav": 11.6117, "actNum": 202, "actDen": 4504, "favNum": 482, "favDen": 4151, "consNum": 684, "consDen": 8655}, {"x": 29, "y": 8.0844, "act": 4.5031, "fav": 12.0694, "actNum": 208, "actDen": 4619, "favNum": 501, "favDen": 4151, "consNum": 709, "consDen": 8770}, {"x": 30, "y": 8.3763, "act": 4.5731, "fav": 12.7439, "actNum": 218, "actDen": 4767, "favNum": 529, "favDen": 4151, "consNum": 747, "consDen": 8918}, {"x": 31, "y": 8.8089, "act": 4.7474, "fav": 13.6112, "actNum": 233, "actDen": 4908, "favNum": 565, "favDen": 4151, "consNum": 798, "consDen": 9059}], "monthEnd": 8.8089}, {"period": "2026-02", "label": "Feb-26", "pts": [{"x": 2, "y": 0.5212, "act": 1.4528, "fav": 0.4334, "actNum": 6, "actDen": 413, "favNum": 19, "favDen": 4384, "consNum": 25, "consDen": 4797}, {"x": 3, "y": 1.0958, "act": 1.8898, "fav": 0.9808, "actNum": 12, "actDen": 635, "favNum": 43, "favDen": 4384, "consNum": 55, "consDen": 5019}, {"x": 4, "y": 1.7901, "act": 2.7682, "fav": 1.5967, "actNum": 24, "actDen": 867, "favNum": 70, "favDen": 4384, "consNum": 94, "consDen": 5251}, {"x": 5, "y": 2.2316, "act": 2.7701, "fav": 2.0985, "actNum": 30, "actDen": 1083, "favNum": 92, "favDen": 4384, "consNum": 122, "consDen": 5467}, {"x": 6, "y": 2.8097, "act": 3.2157, "fav": 2.6916, "actNum": 41, "actDen": 1275, "favNum": 118, "favDen": 4384, "consNum": 159, "consDen": 5659}, {"x": 7, "y": 3.1577, "act": 3.1878, "fav": 3.1478, "actNum": 46, "actDen": 1443, "favNum": 138, "favDen": 4384, "consNum": 184, "consDen": 5827}, {"x": 9, "y": 3.6506, "act": 3.1393, "fav": 3.8549, "actNum": 55, "actDen": 1752, "favNum": 169, "favDen": 4384, "consNum": 224, "consDen": 6136}, {"x": 10, "y": 4.2042, "act": 3.6027, "fav": 4.4708, "actNum": 70, "actDen": 1943, "favNum": 196, "favDen": 4384, "consNum": 266, "consDen": 6327}, {"x": 11, "y": 4.5747, "act": 3.5781, "fav": 5.0639, "actNum": 77, "actDen": 2152, "favNum": 222, "favDen": 4384, "consNum": 299, "consDen": 6536}, {"x": 12, "y": 4.886, "act": 3.7355, "fav": 5.4973, "actNum": 87, "actDen": 2329, "favNum": 241, "favDen": 4384, "consNum": 328, "consDen": 6713}, {"x": 13, "y": 5.2189, "act": 3.7788, "fav": 6.0447, "actNum": 95, "actDen": 2514, "favNum": 265, "favDen": 4384, "consNum": 360, "consDen": 6898}, {"x": 14, "y": 5.7829, "act": 4.3331, "fav": 6.6606, "actNum": 115, "actDen": 2654, "favNum": 292, "favDen": 4384, "consNum": 407, "consDen": 7038}, {"x": 16, "y": 6.1686, "act": 4.5689, "fav": 7.2308, "actNum": 133, "actDen": 2911, "favNum": 317, "favDen": 4384, "consNum": 450, "consDen": 7295}, {"x": 17, "y": 6.5497, "act": 4.7047, "fav": 7.8467, "actNum": 145, "actDen": 3082, "favNum": 344, "favDen": 4384, "consNum": 489, "consDen": 7466}, {"x": 18, "y": 6.9816, "act": 4.8517, "fav": 8.5538, "actNum": 157, "actDen": 3236, "favNum": 375, "favDen": 4384, "consNum": 532, "consDen": 7620}, {"x": 19, "y": 7.2396, "act": 4.9926, "fav": 8.9644, "actNum": 168, "actDen": 3365, "favNum": 393, "favDen": 4384, "consNum": 561, "consDen": 7749}, {"x": 20, "y": 7.6962, "act": 5.2617, "fav": 9.6487, "actNum": 185, "actDen": 3516, "favNum": 423, "favDen": 4384, "consNum": 608, "consDen": 7900}, {"x": 21, "y": 8.1115, "act": 5.4735, "fav": 10.3102, "actNum": 200, "actDen": 3654, "favNum": 452, "favDen": 4384, "consNum": 652, "consDen": 8038}, {"x": 23, "y": 8.3705, "act": 5.5882, "fav": 10.8577, "actNum": 219, "actDen": 3919, "favNum": 476, "favDen": 4384, "consNum": 695, "consDen": 8303}, {"x": 24, "y": 8.657, "act": 5.6404, "fav": 11.4507, "actNum": 229, "actDen": 4060, "favNum": 502, "favDen": 4384, "consNum": 731, "consDen": 8444}, {"x": 25, "y": 8.9005, "act": 5.7231, "fav": 11.9526, "actNum": 241, "actDen": 4211, "favNum": 524, "favDen": 4384, "consNum": 765, "consDen": 8595}, {"x": 26, "y": 9.1511, "act": 5.7679, "fav": 12.5228, "actNum": 252, "actDen": 4369, "favNum": 549, "favDen": 4384, "consNum": 801, "consDen": 8753}, {"x": 27, "y": 9.4634, "act": 5.8576, "fav": 13.1843, "actNum": 265, "actDen": 4524, "favNum": 578, "favDen": 4384, "consNum": 843, "consDen": 8908}, {"x": 28, "y": 9.8782, "act": 5.9621, "fav": 14.0283, "actNum": 277, "actDen": 4646, "favNum": 615, "favDen": 4384, "consNum": 892, "consDen": 9030}], "monthEnd": 9.8782}, {"period": "2026-03", "label": "Mar-26", "pts": [{"x": 2, "y": 0.4622, "act": 1.8018, "fav": 0.3661, "actNum": 6, "actDen": 333, "favNum": 17, "favDen": 4643, "consNum": 23, "consDen": 4976}, {"x": 4, "y": 1.2066, "act": 2.2693, "fav": 1.0554, "actNum": 15, "actDen": 661, "favNum": 49, "favDen": 4643, "consNum": 64, "consDen": 5304}, {"x": 5, "y": 1.8906, "act": 3.2634, "fav": 1.6369, "actNum": 28, "actDen": 858, "favNum": 76, "favDen": 4643, "consNum": 104, "consDen": 5501}, {"x": 6, "y": 2.5039, "act": 3.6517, "fav": 2.2399, "actNum": 39, "actDen": 1068, "favNum": 104, "favDen": 4643, "consNum": 143, "consDen": 5711}, {"x": 7, "y": 2.9646, "act": 3.6508, "fav": 2.7784, "actNum": 46, "actDen": 1260, "favNum": 129, "favDen": 4643, "consNum": 175, "consDen": 5903}, {"x": 9, "y": 3.6337, "act": 3.8089, "fav": 3.5753, "actNum": 59, "actDen": 1549, "favNum": 166, "favDen": 4643, "consNum": 225, "consDen": 6192}, {"x": 10, "y": 4.3615, "act": 4.1017, "fav": 4.4583, "actNum": 71, "actDen": 1731, "favNum": 207, "favDen": 4643, "consNum": 278, "consDen": 6374}, {"x": 11, "y": 4.8286, "act": 4.1623, "fav": 5.1045, "actNum": 80, "actDen": 1922, "favNum": 237, "favDen": 4643, "consNum": 317, "consDen": 6565}, {"x": 12, "y": 5.3195, "act": 4.2645, "fav": 5.7937, "actNum": 89, "actDen": 2087, "favNum": 269, "favDen": 4643, "consNum": 358, "consDen": 6730}, {"x": 13, "y": 5.7495, "act": 4.5093, "fav": 6.3537, "actNum": 102, "actDen": 2262, "favNum": 295, "favDen": 4643, "consNum": 397, "consDen": 6905}, {"x": 14, "y": 6.076, "act": 4.6426, "fav": 6.8275, "actNum": 113, "actDen": 2434, "favNum": 317, "favDen": 4643, "consNum": 430, "consDen": 7077}, {"x": 16, "y": 6.5143, "act": 4.797, "fav": 7.5167, "actNum": 130, "actDen": 2710, "favNum": 349, "favDen": 4643, "consNum": 479, "consDen": 7353}, {"x": 17, "y": 7.1135, "act": 5.2306, "fav": 8.2921, "actNum": 152, "actDen": 2906, "favNum": 385, "favDen": 4643, "consNum": 537, "consDen": 7549}, {"x": 18, "y": 7.4117, "act": 5.2461, "fav": 8.852, "actNum": 162, "actDen": 3088, "favNum": 411, "favDen": 4643, "consNum": 573, "consDen": 7731}, {"x": 19, "y": 7.8155, "act": 5.5487, "fav": 9.3905, "actNum": 179, "actDen": 3226, "favNum": 436, "favDen": 4643, "consNum": 615, "consDen": 7869}, {"x": 20, "y": 8.2252, "act": 5.6397, "fav": 10.1012, "actNum": 190, "actDen": 3369, "favNum": 469, "favDen": 4643, "consNum": 659, "consDen": 8012}, {"x": 21, "y": 8.5665, "act": 5.7917, "fav": 10.6612, "actNum": 203, "actDen": 3505, "favNum": 495, "favDen": 4643, "consNum": 698, "consDen": 8148}, {"x": 23, "y": 8.7621, "act": 5.7847, "fav": 11.1566, "actNum": 216, "actDen": 3734, "favNum": 518, "favDen": 4643, "consNum": 734, "consDen": 8377}, {"x": 24, "y": 9.1229, "act": 5.9112, "fav": 11.8027, "actNum": 229, "actDen": 3874, "favNum": 548, "favDen": 4643, "consNum": 777, "consDen": 8517}, {"x": 25, "y": 9.2087, "act": 5.7886, "fav": 12.2119, "actNum": 236, "actDen": 4077, "favNum": 567, "favDen": 4643, "consNum": 803, "consDen": 8720}, {"x": 26, "y": 9.4874, "act": 5.8782, "fav": 12.7935, "actNum": 250, "actDen": 4253, "favNum": 594, "favDen": 4643, "consNum": 844, "consDen": 8896}, {"x": 27, "y": 9.7959, "act": 6.0398, "fav": 13.3319, "actNum": 264, "actDen": 4371, "favNum": 619, "favDen": 4643, "consNum": 883, "consDen": 9014}, {"x": 28, "y": 10.1728, "act": 6.3347, "fav": 13.8919, "actNum": 285, "actDen": 4499, "favNum": 645, "favDen": 4643, "consNum": 930, "consDen": 9142}, {"x": 30, "y": 10.4763, "act": 6.4393, "fav": 14.5811, "actNum": 304, "actDen": 4721, "favNum": 677, "favDen": 4643, "consNum": 981, "consDen": 9364}, {"x": 31, "y": 11.4454, "act": 7.0944, "fav": 16.0026, "actNum": 345, "actDen": 4863, "favNum": 743, "favDen": 4643, "consNum": 1088, "consDen": 9506}], "monthEnd": 11.4454}, {"period": "2026-04", "label": "Apr-26", "pts": [{"x": 1, "y": 0.3614, "act": 3.5398, "fav": 0.2186, "actNum": 8, "actDen": 226, "favNum": 11, "favDen": 5032, "consNum": 19, "consDen": 5258}, {"x": 2, "y": 0.7904, "act": 3.1863, "fav": 0.5962, "actNum": 13, "actDen": 408, "favNum": 30, "favDen": 5032, "consNum": 43, "consDen": 5440}, {"x": 3, "y": 1.3319, "act": 3.6728, "fav": 1.0533, "actNum": 22, "actDen": 599, "favNum": 53, "favDen": 5032, "consNum": 75, "consDen": 5631}, {"x": 4, "y": 1.7583, "act": 4.2913, "fav": 1.3712, "actNum": 33, "actDen": 769, "favNum": 69, "favDen": 5032, "consNum": 102, "consDen": 5801}, {"x": 6, "y": 2.2164, "act": 3.305, "fav": 1.9873, "actNum": 35, "actDen": 1059, "favNum": 100, "favDen": 5032, "consNum": 135, "consDen": 6091}, {"x": 7, "y": 2.5256, "act": 3.268, "fav": 2.345, "actNum": 40, "actDen": 1224, "favNum": 118, "favDen": 5032, "consNum": 158, "consDen": 6256}, {"x": 8, "y": 2.9069, "act": 3.0692, "fav": 2.8617, "actNum": 43, "actDen": 1401, "favNum": 144, "favDen": 5032, "consNum": 187, "consDen": 6433}, {"x": 9, "y": 3.1563, "act": 3.0809, "fav": 3.1797, "actNum": 48, "actDen": 1558, "favNum": 160, "favDen": 5032, "consNum": 208, "consDen": 6590}, {"x": 10, "y": 3.371, "act": 3.114, "fav": 3.4579, "actNum": 53, "actDen": 1702, "favNum": 174, "favDen": 5032, "consNum": 227, "consDen": 6734}, {"x": 11, "y": 3.7711, "act": 3.268, "fav": 3.9547, "actNum": 60, "actDen": 1836, "favNum": 199, "favDen": 5032, "consNum": 259, "consDen": 6868}, {"x": 13, "y": 4.1291, "act": 3.3915, "fav": 4.4316, "actNum": 70, "actDen": 2064, "favNum": 223, "favDen": 5032, "consNum": 293, "consDen": 7096}, {"x": 14, "y": 4.5744, "act": 3.6751, "fav": 4.9682, "actNum": 81, "actDen": 2204, "favNum": 250, "favDen": 5032, "consNum": 331, "consDen": 7236}, {"x": 15, "y": 4.9722, "act": 3.8214, "fav": 5.5048, "actNum": 89, "actDen": 2329, "favNum": 277, "favDen": 5032, "consNum": 366, "consDen": 7361}, {"x": 16, "y": 5.2597, "act": 3.8741, "fav": 5.942, "actNum": 96, "actDen": 2478, "favNum": 299, "favDen": 5032, "consNum": 395, "consDen": 7510}, {"x": 17, "y": 5.7046, "act": 4.1746, "fav": 6.4984, "actNum": 109, "actDen": 2611, "favNum": 327, "favDen": 5032, "consNum": 436, "consDen": 7643}, {"x": 18, "y": 5.9759, "act": 4.3384, "fav": 6.876, "actNum": 120, "actDen": 2766, "favNum": 346, "favDen": 5032, "consNum": 466, "consDen": 7798}, {"x": 20, "y": 6.137, "act": 4.3216, "fav": 7.2138, "actNum": 129, "actDen": 2985, "favNum": 363, "favDen": 5032, "consNum": 492, "consDen": 8017}, {"x": 21, "y": 6.329, "act": 4.3255, "fav": 7.5715, "actNum": 135, "actDen": 3121, "favNum": 381, "favDen": 5032, "consNum": 516, "consDen": 8153}, {"x": 22, "y": 6.5333, "act": 4.4118, "fav": 7.9094, "actNum": 144, "actDen": 3264, "favNum": 398, "favDen": 5032, "consNum": 542, "consDen": 8296}, {"x": 23, "y": 6.8147, "act": 4.5709, "fav": 8.3267, "actNum": 155, "actDen": 3391, "favNum": 419, "favDen": 5032, "consNum": 574, "consDen": 8423}, {"x": 24, "y": 7.0902, "act": 4.6373, "fav": 8.8037, "actNum": 163, "actDen": 3515, "favNum": 443, "favDen": 5032, "consNum": 606, "consDen": 8547}, {"x": 25, "y": 7.4789, "act": 4.8356, "fav": 9.38, "actNum": 175, "actDen": 3619, "favNum": 472, "favDen": 5032, "consNum": 647, "consDen": 8651}, {"x": 27, "y": 7.7663, "act": 4.8934, "fav": 9.9364, "actNum": 186, "actDen": 3801, "favNum": 500, "favDen": 5032, "consNum": 686, "consDen": 8833}, {"x": 28, "y": 7.9852, "act": 5.0295, "fav": 10.2742, "actNum": 196, "actDen": 3897, "favNum": 517, "favDen": 5032, "consNum": 713, "consDen": 8929}, {"x": 29, "y": 8.2231, "act": 5.1238, "fav": 10.7114, "actNum": 207, "actDen": 4040, "favNum": 539, "favDen": 5032, "consNum": 746, "consDen": 9072}, {"x": 30, "y": 8.5428, "act": 5.3218, "fav": 11.1288, "actNum": 215, "actDen": 4040, "favNum": 560, "favDen": 5032, "consNum": 775, "consDen": 9072}], "monthEnd": 8.5428}];
+
+// ===== SEED DATA (pre-loaded May 2026) =====
+const SEED = {"cur":"2026-05","scenario":"base","hist":"none","targets":{"2026-05":9.0},"months":{"2026-05":[{"day":2,"rate":0.5998,"actNum":8,"actDen":272,"favNum":25,"favDen":5230,"consNum":33,"consDen":5502},{"day":4,"rate":1.0798,"actNum":14,"actDen":512,"favNum":48,"favDen":5230,"consNum":62,"consDen":5742},{"day":6,"rate":2.2047,"actNum":28,"actDen":848,"favNum":106,"favDen":5230,"consNum":134,"consDen":6078},{"day":8,"rate":3.1211,"actNum":40,"actDen":1146,"favNum":159,"favDen":5230,"consNum":199,"consDen":6376},{"day":12,"rate":4.3912,"actNum":63,"actDen":1693,"favNum":241,"favDen":5230,"consNum":304,"consDen":6923},{"day":15,"rate":5.4315,"actNum":86,"actDen":2116,"favNum":313,"favDen":5230,"consNum":399,"consDen":7346}]}};
+
+// ===== STATE =====
+const SK = 'mtd_dash_v3';
+let ST = { months:{}, targets:{}, cur:'', scenario:'base', hist:'none', updatedAt:null };
+let isViewMode = false;
+
+function loadST() {
+  // Priority 1: URL hash (shared state)
+  const hash = location.hash;
+  if (hash && hash.startsWith('#d=')) {
+    try {
+      const b64 = hash.slice(3);
+      const bytes = pako.inflate(Uint8Array.from(atob(b64.replace(/-/g,'+').replace(/_/g,'/')), c => c.charCodeAt(0)));
+      const parsed = JSON.parse(new TextDecoder().decode(bytes));
+      ST = {...ST, ...parsed};
+      isViewMode = true;
+      return;
+    } catch(e) { console.warn('URL state parse failed:', e); }
+  }
+  // Priority 2: localStorage
+  try {
+    const s = localStorage.getItem(SK);
+    if (s) { ST = {...ST, ...JSON.parse(s)}; return; }
+  } catch(e) {}
+  // Priority 3: Seed data
+  ST = {...ST, ...SEED};
+}
+
+function saveST() {
+  ST.updatedAt = new Date().toISOString();
+  try { localStorage.setItem(SK, JSON.stringify(ST)); } catch(e) {}
+  updateShareURL();
+  updateTimestamp();
+}
+
+// ===== SHARE / URL =====
+function encodeState() {
+  const json = JSON.stringify(ST, null, 0);
+  const bytes = new TextEncoder().encode(json);
+  const compressed = pako.deflate(bytes);
+  const b64 = btoa(String.fromCharCode(...compressed)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
+  return b64;
+}
+
+function setBaseUrl() {
+  const val = document.getElementById('baseUrlInput').value.trim().replace(/#.*$/, '');
+  if (!val) return;
+  localStorage.setItem('mtd_base_url', val);
+  updateShareURL();
+}
+
+function updateShareURL() {
+  const encoded = encodeState();
+  const fragment = '#d=' + encoded;
+
+  // Detect broken contexts (file://, srcdoc, null origin)
+  const origin = (location.origin || '');
+  const pathname = (location.pathname || '');
+  const isBroken = origin === 'null' || origin === '' ||
+                   pathname === 'srcdoc' || pathname.includes('srcdoc') ||
+                   !origin.startsWith('http');
+
+  let baseUrl = '';
+  if (!isBroken) {
+    baseUrl = origin + pathname;
+  } else {
+    baseUrl = localStorage.getItem('mtd_base_url') || '';
+  }
+
+  const box = document.getElementById('shareUrlBox');
+  const hint = document.getElementById('hostingHint');
+
+  if (baseUrl) {
+    const fullUrl = baseUrl + fragment;
+    box.textContent = fullUrl;
+    box.setAttribute('data-url', fullUrl);
+    box.setAttribute('data-fragment', fragment);
+    if (hint) hint.style.display = 'none';
+  } else {
+    // No base URL known — show the fragment and the setup hint
+    box.textContent = fragment;
+    box.setAttribute('data-url', fragment);
+    box.setAttribute('data-fragment', fragment);
+    if (hint) hint.style.display = 'flex';
+  }
+}
+
+function copyShareLink() {
+  const box = document.getElementById('shareUrlBox');
+  const url = box.getAttribute('data-url') || box.textContent || '';
+  if (!url) return;
+
+  // Use hidden textarea — reliable across file://, srcdoc, claude.ai, all browsers
+  const ta = document.createElement('textarea');
+  ta.value = url;
+  ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;opacity:0';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  ta.setSelectionRange(0, ta.value.length);
+  try { document.execCommand('copy'); } catch(e) {}
+  document.body.removeChild(ta);
+
+  // Also try modern API
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).catch(() => {});
+  }
+
+  const btn = document.getElementById('shareBtn');
+  const isFragment = url.startsWith('#d=');
+  btn.innerHTML = isFragment ? '✓ Fragment Copied!' : '✓ Copied!';
+  btn.classList.add('copied');
+  setTimeout(() => { btn.innerHTML = '&#128279; Copy Link'; btn.classList.remove('copied'); }, 2500);
+
+  // Highlight the box
+  box.style.color = 'var(--ac2)';
+  setTimeout(() => { box.style.color = ''; }, 3000);
+
+  // If fragment-only, show explanation
+  if (isFragment) {
+    const hint = document.getElementById('hostingHint');
+    if (hint) hint.style.display = 'flex';
+    document.getElementById('addMsg') && (document.getElementById('addMsg').textContent = '');
+    // Flash a note in the share banner
+    const p = document.querySelector('.share-banner p');
+    if (p) {
+      const orig = p.innerHTML;
+      p.innerHTML = '<strong style="color:var(--am)">Fragment copied</strong> — paste it after your hosted file URL, e.g. yoursite.com/mtd_dashboard.html' + url.slice(0,30) + '...';
+      setTimeout(() => { p.innerHTML = orig; }, 5000);
+    }
+  }
+}
+
+function updateTimestamp() {
+  const ts = ST.updatedAt;
+  if (!ts) return;
+  const d = new Date(ts);
+  const fmt = d.toLocaleString('en-IN', {day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  document.getElementById('lastUpdated').textContent = `Last updated: ${fmt}`;
+  document.getElementById('globalUpdated').textContent = `Data as of: ${fmt}`;
+  if (isViewMode) document.getElementById('snapTime').textContent = fmt;
+}
+
+// ===== UTILS =====
+function curMK() { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; }
+function mLabel(k) { if(!k) return ''; const [y,m]=k.split('-').map(Number); return new Date(y,m-1,1).toLocaleDateString('en',{month:'short',year:'2-digit'}).replace(' ','-'); }
+
+// ===== PROJECTION =====
+function project(anchorDay, anchorRate, scenario) {
+  const scKey = {bear:'p25',base:'avg',bull:'recent'}[scenario];
+  const anchorMM = MULT_MATRIX[String(anchorDay)];
+  if (!anchorMM) return {};
+  const proj = {};
+  [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31].forEach(d => {
+    if (d < anchorDay) return;
+    const mm = anchorMM[String(d)];
+    if (!mm) return;
+    proj[d] = Math.max(anchorRate, anchorRate * mm[scKey]);
+  });
+  proj[anchorDay] = anchorRate;
+  return proj;
+}
+
+function getProj() {
+  const pts = (ST.months[ST.cur]||[]).slice().sort((a,b)=>a.day-b.day);
+  if (!pts.length) return null;
+  const anchor = pts[pts.length-1];
+  return {
+    base: project(anchor.day, anchor.rate, 'base'),
+    bear: project(anchor.day, anchor.rate, 'bear'),
+    bull: project(anchor.day, anchor.rate, 'bull'),
+    anchor
+  };
+}
+
+// ===== CHARTS =====
+let mc, hc;
+function initCharts() {
+  mc = new Chart(document.getElementById('mainChart').getContext('2d'), {
+    type:'line', data:{datasets:[]},
+    options:{ responsive:true, maintainAspectRatio:false, animation:{duration:350},
+      plugins:{ legend:{display:false},
+        tooltip:{ backgroundColor:'#1A2030', borderColor:'#232B3A', borderWidth:1,
+          titleColor:'#5A6A80', bodyColor:'#E8EDF5',
+          callbacks:{label:c=>`${c.dataset.label}: ${c.parsed.y!=null?c.parsed.y.toFixed(3)+'%':'—'}`} } },
+      scales:{
+        x:{ type:'linear',min:1,max:31,title:{display:true,text:'Day of Month',color:'#5A6A80',font:{size:10}},
+          ticks:{stepSize:5,color:'#5A6A80',callback:v=>'D'+v},grid:{color:'rgba(35,43,58,.6)'} },
+        y:{ title:{display:true,text:'Rate (%)',color:'#5A6A80',font:{size:10}},
+          ticks:{color:'#5A6A80',callback:v=>v.toFixed(1)+'%'},grid:{color:'rgba(35,43,58,.6)'},min:0 }
+      } }
+  });
+  hc = new Chart(document.getElementById('histChart').getContext('2d'), {
+    type:'bar', data:{labels:[],datasets:[]},
+    options:{ responsive:true, maintainAspectRatio:false, animation:{duration:300},
+      plugins:{ legend:{display:false},
+        tooltip:{ backgroundColor:'#1A2030', borderColor:'#232B3A', borderWidth:1,
+          callbacks:{label:c=>c.parsed.y!=null?c.parsed.y.toFixed(2)+'%':'—'} } },
+      scales:{ x:{ticks:{color:'#5A6A80',font:{size:10}},grid:{display:false}},
+        y:{ticks:{color:'#5A6A80',callback:v=>v+'%'},grid:{color:'rgba(35,43,58,.6)'},min:0} } }
+  });
+}
+
+function updateMainChart() {
+  if(!mc) return;
+  const ds=[];
+  if(ST.hist!=='none') {
+    const months = ST.hist==='recent' ? HISTORY.slice(-3) : HISTORY;
+    months.forEach(h => ds.push({label:h.label,data:h.pts.map(p=>{return{x:p.x,y:p.y}}).filter(Boolean),
+      borderColor:'rgba(255,255,255,0.1)',borderWidth:1,pointRadius:0,tension:0.4,fill:false}));
+  }
+  const proj=getProj();
+  const target=ST.targets[ST.cur]||9;
+  if(proj) {
+    const a=proj.anchor;
+    const mkPts=pd=>Object.entries(pd).filter(([d])=>+d>=a.day).sort((x,y)=>+x[0]-+y[0]).map(([d,v])=>{return{x:+d,y:+parseFloat(v.toFixed(4))}});
+    ds.push({label:'Bear',data:mkPts(proj.bear),borderColor:'rgba(239,68,68,.7)',borderWidth:1.5,pointRadius:0,tension:0.3,fill:false,borderDash:[5,4]});
+    ds.push({label:'Bull',data:mkPts(proj.bull),borderColor:'rgba(16,185,129,.7)',borderWidth:1.5,pointRadius:0,tension:0.3,fill:false,borderDash:[5,4]});
+    ds.push({label:'Base',data:mkPts(proj.base),borderColor:'#3B82F6',borderWidth:2,pointRadius:0,tension:0.3,fill:false});
+  }
+  const pts=(ST.months[ST.cur]||[]).slice().sort((a,b)=>a.day-b.day);
+  if(pts.length) ds.push({label:'Actuals',data:pts.map(p=>{return{x:p.day,y:p.rate}}),
+    borderColor:'#10B981',backgroundColor:'#10B981',borderWidth:2.5,pointRadius:6,pointHoverRadius:8,tension:0.4,fill:false});
+  ds.push({label:'Target',data:[{x:1,y:target},{x:31,y:target}],
+    borderColor:'#F59E0B',borderWidth:1.5,borderDash:[6,3],pointRadius:0,fill:false});
+  mc.data.datasets=ds; mc.update();
+}
+
+function updateHistChart() {
+  if(!hc) return;
+  const labels=HISTORY.map(h=>h.label), vals=HISTORY.map(h=>h.monthEnd);
+  const colors=HISTORY.map((_,i)=>i===HISTORY.length-1?'#4B79BB':'#1E3A5F');
+  const proj=getProj();
+  if(proj&&ST.cur) {
+    const lbl=mLabel(ST.cur);
+    const be=proj.bear[31]||proj.bear[30]||0, ba=proj.base[31]||proj.base[30]||0, bu=proj.bull[31]||proj.bull[30]||0;
+    labels.push(lbl+' Bear',lbl+' Base',lbl+' Bull');
+    vals.push(+be.toFixed(3),+ba.toFixed(3),+bu.toFixed(3));
+    colors.push('rgba(239,68,68,.6)','rgba(59,130,246,.8)','rgba(16,185,129,.8)');
+  }
+  const target=ST.targets[ST.cur]||null;
+  hc.data.labels=labels;
+  hc.data.datasets=[
+    {label:'Rate',data:vals,backgroundColor:colors,borderRadius:4,type:'bar'},
+    ...(target?[{label:'Target',type:'line',data:labels.map(()=>target),
+      borderColor:'#F59E0B',borderWidth:1.5,borderDash:[5,3],pointRadius:0,fill:false}]:[])
+  ];
+  hc.update();
+}
+
+function updateKPIs() {
+  const proj=getProj();
+  const pts=(ST.months[ST.cur]||[]).sort((a,b)=>a.day-b.day);
+  const target=ST.targets[ST.cur]||9;
+  document.getElementById('kTgt').textContent=target.toFixed(1)+'%';
+  document.getElementById('kTgtSub').textContent=`for ${mLabel(ST.cur)||'—'}`;
+  if(!proj||!pts.length) {
+    ['kLat','kBe','kBa','kBu'].forEach(id=>document.getElementById(id).textContent='—');
+    document.getElementById('kLatSub').textContent='No data entered';
+    document.getElementById('kAD').textContent='—';
+    document.getElementById('statusBar').style.display='none'; return;
+  }
+  const a=proj.anchor;
+  const be=proj.bear[31]||proj.bear[30]||0, ba=proj.base[31]||proj.base[30]||0, bu=proj.bull[31]||proj.bull[30]||0;
+  const mm=(MULT_MATRIX[String(a.day)]||{});
+  document.getElementById('kAD').textContent=a.day;
+  document.getElementById('kLat').textContent=a.rate.toFixed(3)+'%';
+  document.getElementById('kLatSub').textContent=mLabel(ST.cur);
+  document.getElementById('kBe').textContent=be.toFixed(2)+'%';
+  document.getElementById('kBeSub').textContent='p25 · '+(mm[31]?.p25||0).toFixed(2)+'× mult';
+  document.getElementById('kBa').textContent=ba.toFixed(2)+'%';
+  document.getElementById('kBaSub').textContent='avg · '+(mm[31]?.avg||0).toFixed(2)+'× mult';
+  document.getElementById('kBu').textContent=bu.toFixed(2)+'%';
+  document.getElementById('kBuSub').textContent='rec · '+(mm[31]?.recent||0).toFixed(2)+'× mult';
+  const chosen={bear:be,base:ba,bull:bu}[ST.scenario];
+  const gap=chosen-target;
+  const bar=document.getElementById('statusBar');
+  bar.style.display='flex'; bar.className='status '+(gap>=0?'ok':gap>=-1?'risk':'bad');
+  document.getElementById('sIc').textContent=gap>=0?'✅':gap>=-1?'⚠️':'🔴';
+  document.getElementById('sTi').textContent=gap>=0?`On Track — ${ST.scenario} case beats target`:gap>=-1?'At Risk — within 1pp of target':`Off Track — ${ST.scenario} below target`;
+  document.getElementById('sDe').textContent=`Target: ${target.toFixed(1)}% · ${ST.scenario}: ${chosen.toFixed(2)}%`;
+  const pi=document.getElementById('sPi');
+  pi.textContent=(gap>=0?'+':'')+gap.toFixed(2)+'pp vs target';
+  pi.className='pill '+(gap>=0?'p-ok':gap>=-1?'p-risk':'p-bad');
+  document.getElementById('chartSub').textContent=`Anchor: Day ${a.day} @ ${a.rate.toFixed(3)}% · All projections ≥ ${a.rate.toFixed(3)}%`;
+}
+
+function updateTable() {
+  const pts=(ST.months[ST.cur]||[]).slice().sort((a,b)=>a.day-b.day);
+  const wrap=document.getElementById('tblWrap');
+  if(!pts.length) { wrap.innerHTML='<div class="empty">No data yet</div>'; return; }
+  const rows=pts.map((p,i)=>`<tr>
+    <td>Day ${p.day}</td>
+    <td style="color:var(--ac2);font-weight:700">${p.rate.toFixed(4)}%</td>
+    <td style="color:var(--mu)">${p.actNum!=null?p.actNum+'/'+p.actDen:'—'}</td>
+    <td style="color:var(--mu)">${p.favNum!=null?p.favNum+'/'+p.favDen:'—'}</td>
+    ${isViewMode?'':'<td><button class="del" onclick="delPt('+i+')">×</button></td>'}
+  </tr>`).join('');
+  wrap.innerHTML=`<table class="tbl"><thead><tr><th>Day</th><th>Cons Rate</th><th>Act N/D</th><th>Fav N/D</th>${isViewMode?'':'<th></th>'}</tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function histGrid() {
+  document.getElementById('hGrid').innerHTML=HISTORY.slice(-6).map(h=>
+    `<div class="hc"><div class="hl">${h.label}</div><div class="hv">${h.monthEnd.toFixed(2)}%</div></div>`).join('');
+}
+
+// ===== MONTH SELECT =====
+function populateMon() {
+  const sel=document.getElementById('monSel');
+  const opts=[];
+  for(let i=0;i<=11;i++) { const d=new Date(); d.setDate(1); d.setMonth(d.getMonth()+i); opts.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`); }
+  sel.innerHTML='<option value="">-- Month --</option>'+opts.map(k=>`<option value="${k}" ${k===ST.cur?'selected':''}>${mLabel(k)}</option>`).join('');
+}
+
+function onMonthChange() {
+  ST.cur=document.getElementById('monSel').value;
+  if(!ST.months[ST.cur]) ST.months[ST.cur]=[];
+  if(!ST.targets[ST.cur]) ST.targets[ST.cur]=9.0;
+  updateTgtUI(); saveST(); refresh();
+}
+
+// ===== INPUT =====
+function msg(t,c='var(--mu)') { const e=document.getElementById('addMsg'); e.textContent=t; e.style.color=c; }
+function validateMonth(ds) {
+  if(!ST.cur) { msg('⚠ Select a month first','var(--am)'); return null; }
+  const d=new Date(ds); if(isNaN(d)) { msg('⚠ Invalid date','var(--am)'); return null; }
+  const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+  if(k!==ST.cur) { msg(`⚠ Date not in ${mLabel(ST.cur)}`,'var(--rd)'); return null; }
+  return d.getDate();
+}
+function upsert(day,rate,an=null,ad=null,fn=null,fd=null,cn=null,cd=null) {
+  if(!ST.months[ST.cur]) ST.months[ST.cur]=[];
+  ST.months[ST.cur]=ST.months[ST.cur].filter(p=>p.day!==day);
+  ST.months[ST.cur].push({day,rate,actNum:an,actDen:ad,favNum:fn,favDen:fd,consNum:cn,consDen:cd});
+  ST.months[ST.cur].sort((a,b)=>a.day-b.day);
+  saveST(); refresh();
+}
+function addSimple() {
+  const day=validateMonth(document.getElementById('sDate').value); if(!day) return;
+  const rate=parseFloat(document.getElementById('sRate').value);
+  if(isNaN(rate)||rate<=0) { msg('⚠ Enter a valid rate','var(--am)'); return; }
+  if(rate>100) { msg('⚠ Enter rate as percentage e.g. 4.39 not 0.0439','var(--am)'); return; }
+  upsert(day,rate); msg(`✓ Day ${day} @ ${rate.toFixed(3)}% added`,'var(--gn)');
+  document.getElementById('sDate').value=''; document.getElementById('sRate').value='';
+}
+function addFull() {
+  const day=validateMonth(document.getElementById('fDate').value); if(!day) return;
+  const an=parseFloat(document.getElementById('fAN').value)||0, ad=parseFloat(document.getElementById('fAD').value)||0;
+  const fn=parseFloat(document.getElementById('fFN').value)||0, fd=parseFloat(document.getElementById('fFD').value)||0;
+  const cn=parseFloat(document.getElementById('fCN').value)||0, cd=parseFloat(document.getElementById('fCD').value)||0;
+  if(cd<=0) { msg('⚠ Cons Denominator must be > 0','var(--am)'); return; }
+  const rate=(cn/cd)*100;
+  upsert(day,rate,an,ad,fn,fd,cn,cd);
+  msg(`✓ Day ${day} → ${rate.toFixed(4)}%`,'var(--gn)');
+}
+function parsePaste() {
+  const raw=document.getElementById('pasteBox').value.trim();
+  if(!ST.cur) { msg('⚠ Select a month first','var(--am)'); return; }
+  const lines=raw.split('\n').filter(l=>l.trim());
+  let added=0,skipped=0;
+  lines.forEach(line => {
+    const cols=line.split('\t').map(s=>s.trim());
+    if(cols.length<2) return;
+    if(cols[0].toLowerCase()==='date') return;
+    const d=new Date(cols[0]); if(isNaN(d)) { skipped++; return; }
+    const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    if(k!==ST.cur) { skipped++; return; }
+    const day=d.getDate();
+    let rate,an=null,ad=null,fn=null,fd=null,cn=null,cd=null;
+    if(cols.length>=10) {
+      an=parseFloat(cols[1]); ad=parseFloat(cols[2]);
+      fn=parseFloat(cols[4]); fd=parseFloat(cols[5]);
+      cn=parseFloat(cols[7]); cd=parseFloat(cols[8]);
+      rate=cd>0?(cn/cd)*100:parseFloat(cols[9])<1?parseFloat(cols[9])*100:parseFloat(cols[9]);
+    } else { const rv=parseFloat(cols[1]); rate=rv<1?rv*100:rv; }
+    if(isNaN(rate)||rate<=0||rate>100) { skipped++; return; }
+    if(!ST.months[ST.cur]) ST.months[ST.cur]=[];
+    ST.months[ST.cur]=ST.months[ST.cur].filter(p=>p.day!==day);
+    ST.months[ST.cur].push({day,rate,actNum:an,actDen:ad,favNum:fn,favDen:fd,consNum:cn,consDen:cd});
+    added++;
+  });
+  ST.months[ST.cur].sort((a,b)=>a.day-b.day);
+  saveST(); refresh();
+  msg(`✓ Imported ${added} rows${skipped?` (${skipped} skipped)`:''}${isViewMode?' — re-share URL to publish':''}`, 'var(--gn)');
+}
+function delPt(idx) {
+  const pts=(ST.months[ST.cur]||[]).slice().sort((a,b)=>a.day-b.day);
+  ST.months[ST.cur]=ST.months[ST.cur].filter(p=>p.day!==pts[idx].day);
+  saveST(); refresh();
+}
+function clearMonth() {
+  if(!confirm(`Clear all data for ${mLabel(ST.cur)}?`)) return;
+  ST.months[ST.cur]=[]; saveST(); refresh();
+}
+
+// ===== TARGET =====
+function updateTgtUI() {
+  const t=ST.targets[ST.cur]||9;
+  document.getElementById('tgtSl').value=Math.min(20,t);
+  document.getElementById('tgtDis').textContent=t.toFixed(1)+'%';
+  document.getElementById('tgtIn').value=t;
+  document.getElementById('kTgt').textContent=t.toFixed(1)+'%';
+  document.getElementById('kTgtSub').textContent=`for ${mLabel(ST.cur)||'—'}`;
+}
+function onTgtSl() {
+  const v=parseFloat(document.getElementById('tgtSl').value);
+  ST.targets[ST.cur]=v; document.getElementById('tgtDis').textContent=v.toFixed(1)+'%'; document.getElementById('tgtIn').value=v;
+  saveST(); refresh();
+}
+function onTgtIn() {
+  const v=parseFloat(document.getElementById('tgtIn').value);
+  if(isNaN(v)||v<=0) return;
+  ST.targets[ST.cur]=v; document.getElementById('tgtSl').value=Math.min(20,v); document.getElementById('tgtDis').textContent=v.toFixed(1)+'%';
+  saveST(); refresh();
+}
+
+// ===== SCENARIO / HIST =====
+function setScen(s) {
+  ST.scenario=s;
+  ['scBear','scBase','scBull'].forEach(id=>document.getElementById(id).classList.remove('active'));
+  document.getElementById('sc'+s[0].toUpperCase()+s.slice(1)).classList.add('active');
+  saveST(); updateKPIs(); updateHistChart();
+}
+function setHist(v) {
+  ST.hist=v;
+  ['None','Recent','All'].forEach(x=>document.getElementById('tog'+x).classList.remove('active'));
+  document.getElementById('tog'+v[0].toUpperCase()+v.slice(1)).classList.add('active');
+  saveST(); updateMainChart();
+}
+
+// ===== TABS =====
+function switchTab(t) {
+  ['simple','full','paste'].forEach(x => {
+    document.getElementById('pane'+x[0].toUpperCase()+x.slice(1)).style.display=x===t?'block':'none';
+    document.getElementById('tab'+x[0].toUpperCase()+x.slice(1)).classList.toggle('active',x===t);
+  });
+}
+
+// ===== REFRESH =====
+function refresh() { updateKPIs(); updateMainChart(); updateHistChart(); updateTable(); }
+
+// ===== INIT =====
+window.onload = function() {
+  loadST();
+  if(!ST.cur) ST.cur=curMK();
+  if(!ST.months[ST.cur]) ST.months[ST.cur]=[];
+  if(!ST.targets[ST.cur]) ST.targets[ST.cur]=9.0;
+
+  populateMon(); initCharts(); updateTgtUI(); histGrid();
+  setScen(ST.scenario||'base'); setHist(ST.hist||'none');
+
+  // Show/hide view mode
+  if(isViewMode) {
+    document.getElementById('viewBanner').style.display='flex';
+    document.getElementById('inputPanel').style.opacity='0.75';
+  }
+
+  // Init share URL
+  updateShareURL(); updateTimestamp(); refresh();
+
+  // Set today's date in inputs
+  const today=new Date().toISOString().split('T')[0];
+  document.getElementById('sDate').value=today;
+  document.getElementById('fDate').value=today;
+};
+</script>
+</body>
+</html>
