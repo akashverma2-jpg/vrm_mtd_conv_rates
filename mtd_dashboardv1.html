@@ -430,18 +430,24 @@ function curMK() { const d=new Date(); return `${d.getFullYear()}-${String(d.get
 function mLabel(k) { if(!k) return ''; const [y,m]=k.split('-').map(Number); return new Date(y,m-1,1).toLocaleDateString('en',{month:'short',year:'2-digit'}).replace(' ','-'); }
 
 // ===== PROJECTION =====
-function project(anchorDay, anchorRate, scenario) {
-  const scKey = {bear:'bear',base:'base',bull:'bull'}[scenario];
-  const anchorMM = MULT_MATRIX[String(anchorDay)];
-  if (!anchorMM) return {};
+function project(anchorDay, anchorRate, scenario, matrix) {
+  const scKey = scenario; 
   const proj = {};
   [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31].forEach(d => {
-    if (d < anchorDay) return;
-    const mm = anchorMM[String(d)];
-    if (!mm) return;
-    proj[d] = Math.max(anchorRate, anchorRate * mm[scKey]);
+    if (d === anchorDay) {
+      proj[d] = anchorRate;
+    } else if (d > anchorDay) {
+      const anchorMM = matrix[String(anchorDay)];
+      if (anchorMM && anchorMM[String(d)]) {
+        proj[d] = Math.max(anchorRate, anchorRate * anchorMM[String(d)][scKey]);
+      }
+    } else {
+      const pastMM = matrix[String(d)];
+      if (pastMM && pastMM[String(anchorDay)]) {
+        proj[d] = Math.min(anchorRate, anchorRate / pastMM[String(anchorDay)][scKey]);
+      }
+    }
   });
-  proj[anchorDay] = anchorRate;
   return proj;
 }
 
@@ -450,9 +456,9 @@ function getProj() {
   if (!pts.length) return null;
   const anchor = pts[pts.length-1];
   return {
-    base: project(anchor.day, anchor.rate, 'base'),
-    bear: project(anchor.day, anchor.rate, 'bear'),
-    bull: project(anchor.day, anchor.rate, 'bull'),
+    base: project(anchor.day, anchor.rate, 'base', MULT_MATRIX),
+    bear: project(anchor.day, anchor.rate, 'bear', MULT_MATRIX),
+    bull: project(anchor.day, anchor.rate, 'bull', MULT_MATRIX),
     anchor
   };
 }
@@ -490,14 +496,19 @@ function updateMainChart() {
   const ds=[];
   if(ST.hist!=='none') {
     const months = ST.hist==='recent' ? HISTORY.slice(-3) : HISTORY;
-    months.forEach(h => ds.push({label:h.label,data:h.pts.map(p=>{return{x:p.x,y:p.y}}).filter(Boolean),
-      borderColor:'rgba(255,255,255,0.1)',borderWidth:1,pointRadius:0,tension:0.4,fill:false}));
+    months.forEach(h => {
+      const histPts = h.pts.map(p=>({x:p.x,y:p.y})).filter(p=>p.y);
+      if (histPts.length) ds.push({label:h.label,data:histPts,
+        borderColor:'rgba(255,255,255,0.35)',borderWidth:1.5,pointRadius:0,tension:0.4,fill:false});
+    });
   }
   const proj=getProj();
   const target=ST.targets[ST.cur]||9;
   if(proj) {
     const a=proj.anchor;
-    const mkPts=pd=>Object.entries(pd).filter(([d])=>+d>=a.day).sort((x,y)=>+x[0]-+y[0]).map(([d,v])=>{return{x:+d,y:+parseFloat(v.toFixed(4))}});
+    const mkPts = pd => Object.entries(pd)
+      .sort((x,y) => +x[0] - +y[0])
+      .map(([d,v]) => ({x:+d, y:+parseFloat(v.toFixed(4))}));
     ds.push({label:'Bear',data:mkPts(proj.bear),borderColor:'rgba(239,68,68,.7)',borderWidth:1.5,pointRadius:0,tension:0.3,fill:false,borderDash:[5,4]});
     ds.push({label:'Bull',data:mkPts(proj.bull),borderColor:'rgba(16,185,129,.7)',borderWidth:1.5,pointRadius:0,tension:0.3,fill:false,borderDash:[5,4]});
     ds.push({label:'Base',data:mkPts(proj.base),borderColor:'#3B82F6',borderWidth:2,pointRadius:0,tension:0.3,fill:false});
@@ -591,8 +602,10 @@ function histGrid() {
 // ===== MONTH SELECT =====
 function populateMon() {
   const sel=document.getElementById('monSel');
-  const opts=[];
-  for(let i=0;i<=11;i++) { const d=new Date(); d.setDate(1); d.setMonth(d.getMonth()+i); opts.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`); }
+  const optsSet=new Set();
+  for(let i=-6;i<=11;i++) { const d=new Date(); d.setDate(1); d.setMonth(d.getMonth()+i); optsSet.add(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`); }
+  if(typeof ST!=='undefined' && ST.months) Object.keys(ST.months).forEach(k=>optsSet.add(k));
+  const opts=Array.from(optsSet).sort();
   sel.innerHTML='<option value="">-- Month --</option>'+opts.map(k=>`<option value="${k}" ${k===ST.cur?'selected':''}>${mLabel(k)}</option>`).join('');
 }
 
@@ -731,7 +744,7 @@ window.onload = function() {
   if(!ST.targets[ST.cur]) ST.targets[ST.cur]=9.0;
 
   populateMon(); initCharts(); updateTgtUI(); histGrid();
-  setScen(ST.scenario||'base'); setHist(ST.hist||'none');
+  setScen(ST.scenario||'base'); setHist(ST.hist||'recent');
 
   // Show/hide view mode
   if(isViewMode) {
