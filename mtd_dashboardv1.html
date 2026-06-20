@@ -262,6 +262,11 @@ hr{border:none;border-top:1px solid var(--bd);margin:10px 0}
         <div class="sc" id="togRecent" onclick="setHist('recent')">Recent 3M</div>
         <div class="sc" id="togAll" onclick="setHist('all')">All</div>
       </div>
+      <div style="font-size:10px;color:var(--mu);font-family:var(--fm);margin-bottom:5px;letter-spacing:.06em;margin-top:12px">PROJECTION ANCHOR</div>
+      <div class="sc-row">
+        <div class="sc active" id="ancLatest" onclick="setAnchor('latest')">Latest Day</div>
+        <div class="sc" id="ancFirst" onclick="setAnchor('first')">First Day</div>
+      </div>
     </div>
   </div>
 </div>
@@ -454,7 +459,7 @@ function project(anchorDay, anchorRate, scenario, matrix) {
 function getProj() {
   const pts = (ST.months[ST.cur]||[]).slice().sort((a,b)=>a.day-b.day);
   if (!pts.length) return null;
-  const anchor = pts[pts.length-1];
+  const anchor = (ST.anchorMode === 'first') ? pts[0] : pts[pts.length-1];
   return {
     base: project(anchor.day, anchor.rate, 'base', MULT_MATRIX),
     bear: project(anchor.day, anchor.rate, 'bear', MULT_MATRIX),
@@ -711,7 +716,7 @@ function onTgtIn() {
   saveST(); refresh();
 }
 
-// ===== SCENARIO / HIST =====
+// ===== SCENARIO / HIST / ANCHOR =====
 function setScen(s) {
   ST.scenario=s;
   ['scBear','scBase','scBull'].forEach(id=>document.getElementById(id).classList.remove('active'));
@@ -723,6 +728,12 @@ function setHist(v) {
   ['None','Recent','All'].forEach(x=>document.getElementById('tog'+x).classList.remove('active'));
   document.getElementById('tog'+v[0].toUpperCase()+v.slice(1)).classList.add('active');
   saveST(); updateMainChart();
+}
+function setAnchor(mode) {
+  ST.anchorMode = mode;
+  ['ancLatest','ancFirst'].forEach(id => document.getElementById(id).classList.remove('active'));
+  document.getElementById(mode === 'latest' ? 'ancLatest' : 'ancFirst').classList.add('active');
+  saveST(); refresh();
 }
 
 // ===== TABS =====
@@ -745,6 +756,7 @@ window.onload = function() {
 
   populateMon(); initCharts(); updateTgtUI(); histGrid();
   setScen(ST.scenario||'base'); setHist(ST.hist||'recent');
+  setAnchor(ST.anchorMode||'latest');
 
   // Show/hide view mode
   if(isViewMode) {
